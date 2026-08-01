@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>VeloApostas — Design System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:         #F6F4EE;
+  --surface:    #FFFFFF;
+  --surface-2:  #FCFBF7;
+  --surface-3:  #EFEAE0;
+  --border:     #E7E2D6;
+  --border-hi:  #DED7C6;
+
+  --text:       #15130E;
+  --text-dim:   #6B6455;
+  --text-sub:   #8C8573;
+  --text-muted: #B8B0A0;
+
+  --ink:            #16140F;
+  --ink-2:          #211D15;
+  --on-ink:         #FFFFFF;
+  --on-ink-dim:     rgba(255,255,255,0.56);
+  --on-ink-sub:     rgba(255,255,255,0.45);
+  --on-ink-border:  rgba(255,255,255,0.10);
+
+  --gold:         #F3C13A;
+  --gold-strong:  #E0A916;
+  --gold-soft:    rgba(243,193,58,0.14);
+  --gold-soft-ink: rgba(243,193,58,0.16);
+  --gold-ink:     #2B2004;
+
+  --green: #16A34A;
+  --amber: #B8860B;
+  --red:   #D0452A;
+  --blue:  #2563EB;
+  --green-text: #146633;
+  --amber-text: #734C06;
+  --blue-text:  #1E40AF;
+
+  --medal-1: #C79A2E;
+  --medal-2: #6E7480;
+  --medal-3: #B5651D;
+
+  --radius-sm:   8px;
+  --radius-md:   14px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  --radius-pill: 999px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Archivo', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 56px 24px 120px; }
+
+.mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.display-2xl { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; font-size: 44px; line-height: 1.05; margin: 6px 0 0; }
+.display-xl  { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 30px; line-height: 1.1; }
+.display-lg  { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 22px; line-height: 1.15; }
+
+/* Header do próprio guia */
+.guide-header { margin-bottom: 64px; }
+.guide-header .eyebrow { margin-bottom: 10px; }
+.guide-header p.sub { color: var(--text-dim); font-size: 15px; max-width: 640px; margin-top: 14px; }
+
+section.block { margin-bottom: 72px; }
+.block-title { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+.block-title h2 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 26px; margin: 0; }
+.block-title .num { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-sub); }
+
+/* Swatches */
+.swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.swatch { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.swatch .chip { height: 64px; }
+.swatch .meta { padding: 10px 12px; }
+.swatch .meta .name { font-size: 12px; font-weight: 600; }
+.swatch .meta .hex { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+
+/* Typography specimen rows */
+.type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.type-row:last-child { border-bottom: none; }
+.type-row .label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-sub); width: 140px; flex-shrink: 0; }
+.type-row .sample { flex: 1; }
+.type-row .meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-sub); white-space: nowrap; }
+
+/* Scale swatches (spacing/radius) */
+.scale-row { display: flex; align-items: center; gap: 16px; padding: 10px 0; }
+.scale-row .box { background: var(--ink); }
+.scale-row .lab { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); width: 60px; }
+
+/* Buttons */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: 'Archivo', sans-serif; font-size: 14px; font-weight: 700;
+  background: var(--gold); color: var(--gold-ink);
+  padding: 14px 20px; border-radius: var(--radius-lg);
+  border: none; cursor: pointer;
+}
+.btn-primary:hover { background: var(--gold-strong); }
+.btn-primary.disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: transparent; color: var(--text);
+  padding: 12px 18px; border-radius: var(--radius-md);
+  font-family: 'Archivo', sans-serif; font-size: 14px; font-weight: 600;
+  border: 1px solid var(--border-hi); cursor: pointer;
+}
+
+/* Badges */
+.badge-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--radius-pill);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.badge-status .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.badge-aberta      { background: rgba(22,163,74,.10);  color: var(--green-text); }
+.badge-fechada     { background: rgba(184,134,11,.12); color: var(--amber-text); }
+.badge-finalizada  { background: var(--surface-3);     color: var(--text-dim); }
+.badge-a-decorrer  { background: var(--gold-soft-ink); color: var(--gold); }
+.badge-brevemente  { background: rgba(37,99,235,.10);  color: var(--blue-text); }
+
+/* Component preview shell */
+.preview {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
+}
+
+/* Card hero */
+.card-hero {
+  background: var(--ink); color: var(--on-ink);
+  border-radius: var(--radius-xl); padding: 24px;
+  width: 340px;
+}
+.card-hero .row-top { display: flex; justify-content: space-between; align-items: center; }
+.card-hero .eyebrow-ink { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--on-ink-sub); }
+.card-hero .title { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 26px; margin: 10px 0 0; }
+.card-hero .divider { border-top: 1px solid var(--on-ink-border); margin: 18px 0; }
+.card-hero .stats { display: flex; }
+.card-hero .stat { flex: 1; }
+.card-hero .stat + .stat { border-left: 1px solid var(--on-ink-border); padding-left: 16px; margin-left: 16px; }
+.card-hero .stat .lab { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--on-ink-sub); }
+.card-hero .stat .val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; margin-top: 4px; }
+.card-hero .stat .val .unit { font-size: 12px; font-weight: 500; color: var(--on-ink-dim); margin-left: 3px; }
+.card-hero .deadline-row { display: flex; gap: 24px; }
+.card-hero .deadline-row .val { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; margin-top: 4px; }
+.card-hero .deadline-row .val.urgent { color: var(--gold); }
+.card-hero .cta { margin-top: 20px; width: 100%; }
+
+/* Info card */
+.info-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px;
+  width: 300px; display: flex; align-items: center; gap: 14px;
+}
+.info-card .avatar-wrap { position: relative; flex-shrink: 0; }
+.info-card .avatar {
+  width: 52px; height: 52px; border-radius: 999px;
+  background: var(--gold-soft); display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.rank-badge-circle {
+  position: absolute; bottom: -4px; right: -4px;
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 999px;
+  background: var(--ink); color: var(--on-ink);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+  border: 2px solid var(--bg);
+}
+.info-card .name { font-weight: 700; font-size: 15px; }
+.info-card .sub { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+.info-card .val { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; margin-top: 4px; }
+.info-card .val .unit { font-size: 11px; font-weight: 500; color: var(--text-sub); }
+
+/* Bottom nav */
+.bottom-nav-demo {
+  width: 340px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 12px 8px;
+  display: flex; justify-content: space-around;
+}
+.bottom-nav-demo .item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-sub); }
+.bottom-nav-demo .item.active { color: var(--text); font-weight: 600; }
+.bottom-nav-demo .item .ic { font-size: 18px; }
+.bottom-nav-demo .item .lb { font-family: 'Archivo', sans-serif; font-size: 10px; font-weight: 600; }
+
+/* Leaderboard row */
+.lb-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.lb-table th { text-align: left; padding: 10px 16px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub); border-bottom: 1px solid var(--border); }
+.lb-table td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
+.lb-table tr:nth-child(even) td { background: var(--surface-2); }
+.lb-table tr:last-child td { border-bottom: none; }
+.lb-table .pts { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+.medal-1 { color: var(--medal-1); font-weight: 800; }
+.medal-2 { color: var(--medal-2); font-weight: 800; }
+.medal-3 { color: var(--medal-3); font-weight: 800; }
+
+footer { margin-top: 100px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--text-sub); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="guide-header">
+    <div class="eyebrow">VeloApostas · Design System</div>
+    <div class="display-2xl">Direção <em>editorial</em>.</div>
+    <p class="sub">Fundo claro, cards em preto para os momentos que importam, dourado como sinal de ação, serif itálico nos títulos, monoespaçada em todos os números. Esta página é a referência viva para construir a webapp.</p>
+  </div>
+
+  <!-- 1. COR -->
+  <section class="block">
+    <div class="block-title"><span class="num">01</span><h2>Cor</h2></div>
+
+    <p class="eyebrow" style="margin-bottom:12px;">Base — fundo claro</p>
+    <div class="swatch-grid" style="margin-bottom:28px;">
+      <div class="swatch"><div class="chip" style="background:var(--bg)"></div><div class="meta"><div class="name">bg</div><div class="hex">#F6F4EE</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--surface); border-bottom:1px solid var(--border)"></div><div class="meta"><div class="name">surface</div><div class="hex">#FFFFFF</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--surface-3)"></div><div class="meta"><div class="name">surface-3</div><div class="hex">#EFEAE0</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--border)"></div><div class="meta"><div class="name">border</div><div class="hex">#E7E2D6</div></div></div>
+    </div>
+
+    <p class="eyebrow" style="margin-bottom:12px;">Texto</p>
+    <div class="swatch-grid" style="margin-bottom:28px;">
+      <div class="swatch"><div class="chip" style="background:var(--text)"></div><div class="meta"><div class="name">text</div><div class="hex">#15130E · 16.9:1</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--text-dim)"></div><div class="meta"><div class="name">text-dim</div><div class="hex">#6B6455 · 5.3:1</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--text-sub)"></div><div class="meta"><div class="name">text-sub (só placeholders)</div><div class="hex">#8C8573 · 3.3:1</div></div></div>
+    </div>
+
+    <p class="eyebrow" style="margin-bottom:12px;">Preto editorial (card hero)</p>
+    <div class="swatch-grid" style="margin-bottom:28px;">
+      <div class="swatch"><div class="chip" style="background:var(--ink)"></div><div class="meta"><div class="name">ink</div><div class="hex">#16140F</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--ink-2)"></div><div class="meta"><div class="name">ink-2</div><div class="hex">#211D15</div></div></div>
+    </div>
+
+    <p class="eyebrow" style="margin-bottom:12px;">Dourado — accent de ação</p>
+    <div class="swatch-grid" style="margin-bottom:28px;">
+      <div class="swatch"><div class="chip" style="background:var(--gold)"></div><div class="meta"><div class="name">gold</div><div class="hex">#F3C13A</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--gold-strong)"></div><div class="meta"><div class="name">gold-strong</div><div class="hex">#E0A916</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--gold-ink)"></div><div class="meta"><div class="name">gold-ink</div><div class="hex">#2B2004</div></div></div>
+    </div>
+
+    <p class="eyebrow" style="margin-bottom:12px;">Semântica &amp; medalhas</p>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="chip" style="background:var(--green)"></div><div class="meta"><div class="name">green · identidade</div><div class="hex">#16A34A</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--green-text)"></div><div class="meta"><div class="name">green-text · badge</div><div class="hex">#146633</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--amber)"></div><div class="meta"><div class="name">amber · identidade</div><div class="hex">#B8860B</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--amber-text)"></div><div class="meta"><div class="name">amber-text · badge</div><div class="hex">#734C06</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--red)"></div><div class="meta"><div class="name">red · erro</div><div class="hex">#D0452A</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--medal-1)"></div><div class="meta"><div class="name">medal-1</div><div class="hex">#C79A2E</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--medal-2)"></div><div class="meta"><div class="name">medal-2</div><div class="hex">#6E7480</div></div></div>
+      <div class="swatch"><div class="chip" style="background:var(--medal-3)"></div><div class="meta"><div class="name">medal-3</div><div class="hex">#B5651D</div></div></div>
+    </div>
+  </section>
+
+  <!-- 2. TIPOGRAFIA -->
+  <section class="block">
+    <div class="block-title"><span class="num">02</span><h2>Tipografia</h2></div>
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:8px 24px;">
+      <div class="type-row"><div class="label">display-2xl</div><div class="sample display-2xl">Olá, Nuno.</div><div class="meta">Fraunces italic 400 · 44px</div></div>
+      <div class="type-row"><div class="label">display-xl</div><div class="sample display-xl">Alpe d'Huez</div><div class="meta">Fraunces italic 500 · 30px</div></div>
+      <div class="type-row"><div class="label">display-lg</div><div class="sample display-lg">Classificação geral</div><div class="meta">Fraunces italic 500 · 22px</div></div>
+      <div class="type-row"><div class="label">body</div><div class="sample" style="font-size:14px;">Tens 2h14m para escolher o teu ciclista para a etapa 9.</div><div class="meta">Archivo 500 · 14px</div></div>
+      <div class="type-row"><div class="label">button</div><div class="sample" style="font-size:14px; font-weight:700;">Escolher ciclistas</div><div class="meta">Archivo 700 · 14px</div></div>
+      <div class="type-row"><div class="label">eyebrow</div><div class="sample eyebrow">Quinta, 23 julho · 11:15</div><div class="meta">JetBrains Mono 600 · 11px</div></div>
+      <div class="type-row"><div class="label">stat-lg</div><div class="sample mono" style="font-size:30px; font-weight:700;">02:14:07</div><div class="meta">JetBrains Mono 700 · 30px</div></div>
+    </div>
+  </section>
+
+  <!-- 3. ESPAÇAMENTO & RADIUS -->
+  <section class="block">
+    <div class="block-title"><span class="num">03</span><h2>Espaçamento &amp; radius</h2></div>
+    <div style="display:flex; gap:56px; flex-wrap:wrap;">
+      <div>
+        <p class="eyebrow" style="margin-bottom:12px;">Espaçamento (base 4px)</p>
+        <div class="scale-row"><div class="box" style="width:4px;height:16px;"></div><div class="lab">4</div></div>
+        <div class="scale-row"><div class="box" style="width:8px;height:16px;"></div><div class="lab">8</div></div>
+        <div class="scale-row"><div class="box" style="width:16px;height:16px;"></div><div class="lab">16</div></div>
+        <div class="scale-row"><div class="box" style="width:24px;height:16px;"></div><div class="lab">24</div></div>
+        <div class="scale-row"><div class="box" style="width:32px;height:16px;"></div><div class="lab">32</div></div>
+        <div class="scale-row"><div class="box" style="width:48px;height:16px;"></div><div class="lab">48</div></div>
+        <div class="scale-row"><div class="box" style="width:64px;height:16px;"></div><div class="lab">64</div></div>
+      </div>
+      <div>
+        <p class="eyebrow" style="margin-bottom:12px;">Radius</p>
+        <div class="scale-row"><div class="box" style="width:32px;height:32px;border-radius:8px;"></div><div class="lab">sm · 8</div></div>
+        <div class="scale-row"><div class="box" style="width:32px;height:32px;border-radius:14px;"></div><div class="lab">md · 14</div></div>
+        <div class="scale-row"><div class="box" style="width:32px;height:32px;border-radius:20px;"></div><div class="lab">lg · 20</div></div>
+        <div class="scale-row"><div class="box" style="width:40px;height:40px;border-radius:28px;"></div><div class="lab">xl · 28</div></div>
+        <div class="scale-row"><div class="box" style="width:32px;height:32px;border-radius:999px;"></div><div class="lab">pill</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. BOTÕES & BADGES -->
+  <section class="block">
+    <div class="block-title"><span class="num">04</span><h2>Botões &amp; badges</h2></div>
+    <div class="preview" style="margin-bottom:16px;">
+      <button class="btn-primary">Escolher ciclistas →</button>
+      <button class="btn-primary disabled">Escolher ciclistas →</button>
+      <button class="btn-secondary">Ver detalhes</button>
+    </div>
+    <div class="preview">
+      <span class="badge-status badge-brevemente"><span class="dot"></span>Brevemente</span>
+      <span class="badge-status badge-aberta"><span class="dot"></span>Aberta</span>
+      <span class="badge-status badge-fechada"><span class="dot"></span>Fechada</span>
+      <span class="badge-status badge-finalizada"><span class="dot"></span>Finalizada</span>
+      <span class="badge-status badge-a-decorrer" style="background:var(--ink); color:var(--gold);"><span class="dot"></span>A decorrer</span>
+    </div>
+  </section>
+
+  <!-- 5. CARD HERO -->
+  <section class="block">
+    <div class="block-title"><span class="num">05</span><h2>Card hero</h2></div>
+    <div class="preview">
+      <div class="card-hero">
+        <div class="row-top">
+          <div>
+            <div class="eyebrow-ink">Próxima etapa · Quinta</div>
+            <div class="title">Alpe d'Huez</div>
+          </div>
+          <span class="badge-status" style="background:var(--gold-soft-ink); color:var(--gold);"><span class="dot"></span>A decorrer</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stats">
+          <div class="stat"><div class="lab">Dist.</div><div class="val">180<span class="unit">km</span></div></div>
+          <div class="stat"><div class="lab">Asc.</div><div class="val">4250<span class="unit">m</span></div></div>
+          <div class="stat"><div class="lab">Ordem</div><div class="val">3<span class="unit">/6</span></div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="deadline-row">
+          <div><div class="eyebrow-ink">Deadline</div><div class="val">13:30</div></div>
+          <div><div class="eyebrow-ink">Restam</div><div class="val urgent">02:14:07</div></div>
+        </div>
+        <button class="btn-primary cta">Escolher ciclistas →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. INFO CARD & AVATAR -->
+  <section class="block">
+    <div class="block-title"><span class="num">06</span><h2>Info card &amp; avatar</h2></div>
+    <div class="preview">
+      <div class="info-card">
+        <div class="avatar-wrap">
+          <div class="avatar">🟡</div>
+          <div class="rank-badge-circle">1º</div>
+        </div>
+        <div>
+          <div class="name">Camisola Amarela</div>
+          <div class="sub">Mais pontos totais</div>
+          <div class="val">147<span class="unit"> pts totais</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. BOTTOM NAV -->
+  <section class="block">
+    <div class="block-title"><span class="num">07</span><h2>Bottom navigation</h2></div>
+    <div class="preview">
+      <div class="bottom-nav-demo">
+        <div class="item active"><div class="ic">⌂</div><div class="lb">Hoje</div></div>
+        <div class="item"><div class="ic">▤</div><div class="lb">Etapas</div></div>
+        <div class="item"><div class="ic">☆</div><div class="lb">Classif.</div></div>
+        <div class="item"><div class="ic">◯</div><div class="lb">Eu</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. LEADERBOARD -->
+  <section class="block">
+    <div class="block-title"><span class="num">08</span><h2>Leaderboard</h2></div>
+    <table class="lb-table">
+      <thead>
+        <tr><th>#</th><th>Participante</th><th>Etapas</th><th>Camisolas</th><th>Pontos</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="medal-1 mono">1</td><td>Nuno Ferreira</td><td class="mono">9</td><td class="mono">2</td><td class="pts">147</td></tr>
+        <tr><td class="medal-2 mono">2</td><td>Inês Anjo</td><td class="mono">9</td><td class="mono">1</td><td class="pts">139</td></tr>
+        <tr><td class="medal-3 mono">3</td><td>Rui Costa</td><td class="mono">8</td><td class="mono">1</td><td class="pts">121</td></tr>
+        <tr><td class="mono">4</td><td>Marta Silva</td><td class="mono">9</td><td class="mono">0</td><td class="pts">98</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>VeloApostas — Design System · v1 · editorial premium</footer>
+</div>
+</body>
+</html>

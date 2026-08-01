@@ -1,0 +1,192 @@
+/* ============================================================
+   VeloApostas — Design System Tokens (redesign editorial)
+   Cola isto no início do teu globals.css, substituindo o bloco
+   `:root { ... }` e `@layer components` atuais.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Base — fundo claro */
+    --bg:         #F6F4EE;
+    --surface:    #FFFFFF;
+    --surface-2:  #FCFBF7;
+    --surface-3:  #EFEAE0;
+    --border:     #E7E2D6;
+    --border-hi:  #DED7C6;
+
+    /* Texto sobre fundo claro */
+    --text:       #15130E;
+    --text-dim:   #6B6455;  /* 5.3:1 sobre --bg — usar em labels/eyebrows que têm de ser lidos */
+    --text-sub:   #8C8573;  /* 3.3:1 — só placeholders/disabled, nunca conteúdo a ler */
+    --text-muted: #B8B0A0;  /* decorativo, nunca texto */
+
+    /* Preto editorial (card hero) */
+    --ink:            #16140F;
+    --ink-2:          #211D15;
+    --on-ink:         #FFFFFF;
+    --on-ink-dim:     rgba(255,255,255,0.56);
+    --on-ink-sub:     rgba(255,255,255,0.45); /* 4.5:1 sobre --ink — mínimo para labels legíveis */
+    --on-ink-border:  rgba(255,255,255,0.10);
+
+    /* Dourado — accent de ação/urgência */
+    --gold:         #F3C13A;
+    --gold-strong:  #E0A916;
+    --gold-soft:    rgba(243,193,58,0.14);
+    --gold-soft-ink: rgba(243,193,58,0.16); /* variante sobre --ink */
+    --gold-ink:     #2B2004;
+
+    /* Semântica — cor de identidade (dots/ícones) */
+    --green: #16A34A;
+    --amber: #B8860B;
+    --red:   #D0452A;
+    --blue:  #2563EB;
+
+    /* Semântica — texto (contraste AA sobre o respetivo fundo tintado) */
+    --green-text: #146633;
+    --amber-text: #734C06;
+    --blue-text:  #1E40AF;
+
+    /* Medalhas */
+    --medal-1: #C79A2E;
+    --medal-2: #6E7480; /* mais escuro que a prata "pura" para garantir legibilidade */
+    --medal-3: #B5651D;
+
+    /* Radius */
+    --radius-sm:   8px;
+    --radius-md:   14px;
+    --radius-lg:   20px;
+    --radius-xl:   28px;
+    --radius-pill: 999px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Archivo', system-ui, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  * { box-sizing: border-box; }
+}
+
+@layer components {
+
+  /* ── Tipografia utilitária ── */
+  .font-display { font-family: 'Fraunces', serif; font-style: italic; }
+  .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6875rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .eyebrow-on-ink { color: var(--on-ink-sub); }
+
+  .display-2xl { font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; font-size: 2.5rem;   line-height: 1.05; }
+  .display-xl  { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 1.875rem; line-height: 1.1; }
+  .display-lg  { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 1.375rem; line-height: 1.15; }
+
+  .stat-lg   { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.875rem; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat-md   { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.125rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat-unit { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 0.75rem; color: var(--text-sub); }
+
+  /* ── Botões ── */
+  .btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    font-family: 'Archivo', sans-serif; font-size: 0.875rem; font-weight: 700;
+    background: var(--gold); color: var(--gold-ink);
+    padding: 1rem 1.25rem; border-radius: var(--radius-lg);
+    transition: background 0.15s ease; cursor: pointer;
+    text-decoration: none; white-space: nowrap;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--gold-strong); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    background: transparent; color: var(--text);
+    padding: 0.75rem 1.1rem; border-radius: var(--radius-md);
+    font-family: 'Archivo', sans-serif; font-size: 0.875rem; font-weight: 600;
+    border: 1px solid var(--border-hi); transition: background 0.15s ease; cursor: pointer;
+    text-decoration: none;
+  }
+  .btn-secondary:hover { background: var(--surface-3); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+  }
+  .card-hero {
+    background: var(--ink);
+    color: var(--on-ink);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+  }
+  .card-hero .divider { border-top: 1px solid var(--on-ink-border); margin: 16px 0; }
+
+  .input-field {
+    width: 100%; border-radius: var(--radius-md); font-size: 0.9rem;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 0.75rem 1rem; transition: all 0.15s ease;
+    font-family: 'Archivo', sans-serif;
+  }
+  .input-field::placeholder { color: var(--text-sub); }
+  .input-field:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 3px rgba(22,20,15,0.08); }
+
+  /* ── Badges de estado ── */
+  .badge-status {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.3rem 0.6rem; border-radius: var(--radius-pill);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .badge-status .dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+  .badge-aberta      { background: rgba(22,163,74,.10);  color: var(--green-text); }
+  .badge-fechada     { background: rgba(184,134,11,.12); color: var(--amber-text); }
+  .badge-finalizada  { background: var(--surface-3);     color: var(--text-dim); }
+  .badge-a-decorrer  { background: var(--gold-soft-ink); color: var(--gold); }
+  .badge-brevemente  { background: rgba(37,99,235,.10);  color: var(--blue-text); }
+
+  .badge-categoria {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.25rem 0.5rem; border-radius: var(--radius-sm);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--surface-3); color: var(--text-dim); border: 1px solid var(--border);
+  }
+
+  /* ── Rank / medalhas ── */
+  .rank-medal-1 { color: var(--medal-1); font-weight: 800; }
+  .rank-medal-2 { color: var(--medal-2); font-weight: 800; }
+  .rank-medal-3 { color: var(--medal-3); font-weight: 800; }
+
+  .rank-badge-circle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 999px;
+    background: var(--ink); color: var(--on-ink);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; font-weight: 700;
+    border: 2px solid var(--bg);
+  }
+
+  /* ── Bottom nav ── */
+  .bottom-nav {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .bottom-nav-item { color: var(--text-sub); }
+  .bottom-nav-item.active { color: var(--text); font-weight: 600; }
+  .bottom-nav-spacer { height: calc(5rem + env(safe-area-inset-bottom)); }
+}
