@@ -175,7 +175,7 @@ export default function ProximasPage() {
   if (loading) return null
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
         <div className="flex-1 flex items-center relative">
@@ -208,7 +208,7 @@ export default function ProximasPage() {
         </div>
       </header>
 
-      <div className="max-w-[560px] mx-auto px-5 py-5">
+      <div className="max-w-[560px] mx-auto px-5 py-5 flex-1 w-full">
         <div className="eyebrow mb-2">Calendário</div>
         <div className="display-lg mb-5">Próximas provas</div>
 
@@ -225,34 +225,40 @@ export default function ProximasPage() {
               return (
                 <div key={comp.id}>
                   <div
-                    className={`flex items-center gap-4 px-5 py-3.5 border-b border-border ${i % 2 === 1 ? 'bg-surface-2' : ''} ${hasStages ? 'cursor-pointer' : ''}`}
+                    className={`flex flex-col gap-2 px-5 py-3.5 border-b border-border ${i % 2 === 1 ? 'bg-surface-2' : ''} ${hasStages ? 'cursor-pointer' : ''}`}
                     onClick={() => hasStages && setExpandedId(isExpanded ? null : comp.id)}
                   >
-                    <div className="mono text-xs text-text-dim flex-shrink-0" style={{ minWidth: 66 }}>
-                      {comp.startDate} – {comp.endDate}
-                    </div>
-                    <div className="flex-1 text-sm font-semibold min-w-0 truncate">{comp.name}</div>
-
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {comp.isOngoing ? (
-                        <span className="badge-status badge-a-decorrer">
-                          <span className="dot" />A decorrer
-                        </span>
-                      ) : (
-                        <div className={`mono text-sm font-bold text-right ${comp.urgent ? 'text-gold-strong' : 'text-text'}`} style={{ minWidth: 60 }}>
-                          Faltam {comp.daysLeft}
-                        </div>
-                      )}
-                      <button
-                        className="btn-primary text-xs px-3.5 py-2"
-                        disabled={comp.disabled}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        Apostar
-                      </button>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold min-w-0 truncate">{comp.name}</div>
+                      {hasStages && <ChevronIcon expanded={isExpanded} />}
                     </div>
 
-                    {hasStages && <ChevronIcon expanded={isExpanded} />}
+                    <div className="flex items-center gap-4">
+                      <div className="mono text-xs text-text-dim flex-shrink-0" style={{ minWidth: 66 }}>
+                        {comp.startDate} – {comp.endDate}
+                      </div>
+
+                      <div className="flex-1" />
+
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {comp.isOngoing ? (
+                          <span className="badge-status badge-a-decorrer">
+                            <span className="dot" />A decorrer
+                          </span>
+                        ) : (
+                          <div className={`mono text-sm font-bold text-right ${comp.urgent ? 'text-gold-strong' : 'text-text'}`} style={{ minWidth: 60 }}>
+                            Faltam {comp.daysLeft}
+                          </div>
+                        )}
+                        <button
+                          className="btn-primary text-xs px-3.5 py-2"
+                          disabled={comp.disabled}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          Apostar
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {isExpanded && hasStages && (
