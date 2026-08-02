@@ -43,7 +43,7 @@ const UserIcon = () => (
 
 const TABS: { label: string; icon: () => React.ReactElement; href: string | null }[] = [
   { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
-  { label: 'Próximas', icon: CalendarIcon, href: null },
+  { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
   { label: 'Histórico', icon: ListIcon, href: null },
   { label: 'Eu', icon: UserIcon, href: '/perfil' },
