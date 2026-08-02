@@ -1,10 +1,59 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-// ── Ícones (mesmo estilo outline das outras páginas) ──
+const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+const MESES = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+]
+
+// TODO: substituir por dados reais da tabela `provas`/`etapas` do Supabase
+// quando a próxima etapa e a classificação estiverem disponíveis.
+const proximaEtapa = {
+  numero: 8,
+  nome: 'Colombey-les-Deux-Églises',
+  distancia: 198,
+  elevacao: 2140,
+  horaInicio: '14:30',
+  status: 'Brevemente' as 'Brevemente' | 'A decorrer' | 'Finalizada',
+  inicioEm: (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(14, 30, 0, 0)
+    return d
+  })(),
+}
+
+// Vazio até a etapa finalizar e existirem resultados reais.
+const classificacaoTop20: { posicao: number; nome: string; tempo: string }[] = []
+
+function formatarData(date: Date) {
+  return {
+    diaSemana: DIAS[date.getDay()],
+    dataStr: `${date.getDate()} ${MESES[date.getMonth()]}`,
+  }
+}
+
+function formatarHora(date: Date) {
+  return date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+}
+
+function badgeClass(status: string) {
+  if (status === 'A decorrer') return 'badge-a-decorrer'
+  if (status === 'Finalizada') return 'badge-finalizada'
+  return 'badge-brevemente'
+}
+
+function medalClass(pos: number) {
+  if (pos === 1) return 'text-medal-1'
+  if (pos === 2) return 'text-medal-2'
+  if (pos === 3) return 'text-medal-3'
+  return 'text-text'
+}
+
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -30,148 +79,54 @@ const UserIcon = () => (
     <circle cx="12" cy="7" r="4" />
   </svg>
 )
-const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="w-4 h-4 flex-shrink-0 transition-transform"
-    style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
-  >
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-)
 
-const TABS: { label: string; icon: () => React.ReactElement; href: string | null }[] = [
-  { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
-  { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
-  { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
-  { label: 'Eu', icon: UserIcon, href: '/perfil' },
+const TABS: { label: string; icon: () => React.ReactElement; active: boolean; href: string | null }[] = [
+  { label: 'Hoje', icon: HomeIcon, active: true, href: '/hoje' },
+  { label: 'Próximas', icon: CalendarIcon, active: false, href: '/proximas' },
+  { label: 'Classificação', icon: StarIcon, active: false, href: '/classificacao' },
+  { label: 'Eu', icon: UserIcon, active: false, href: '/perfil' },
 ]
 
-type ProvaRow = {
-  id: string
-  nome: string
-  data_inicio: string
-  data_fim: string
-  status: 'aberta' | 'fechada' | 'finalizada'
-}
-
-type EtapaPlaneada = {
-  id: string
-  prova_id: string
-  numero_etapa: number
-  perfil: string | null
-  distancia_km: number | null
-}
-
-type Competicao = {
-  id: string
-  name: string
-  startDate: string
-  endDate: string
-  daysLeft: number
-  isOngoing: boolean
-  urgent: boolean
-  disabled: boolean
-  stagesDetails: EtapaPlaneada[]
-}
-
-function parseISODate(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
-function formatDateShort(iso: string) {
-  const d = parseISODate(iso)
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-function diasAte(iso: string) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = parseISODate(iso)
-  target.setHours(0, 0, 0, 0)
-  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-export default function ProximasPage() {
-  const [loading, setLoading] = useState(true)
-  const [provas, setProvas] = useState<ProvaRow[]>([])
-  const [etapasPorProva, setEtapasPorProva] = useState<Record<string, EtapaPlaneada[]>>({})
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
-  const [menuOpen, setMenuOpen] = useState(false)
+export default function HojePage() {
+  const [now, setNow] = useState<Date | null>(null)
+  const [userName, setUserName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
+    setNow(new Date())
+    const timer = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
     ;(async () => {
-      const supabase = createClient()
       const { data: userData } = await supabase.auth.getUser()
       const uid = userData.user?.id
-      if (uid) {
-        const { data: perfil } = await supabase.from('perfis').select('avatar_url').eq('id', uid).single()
-        setAvatarUrl(perfil?.avatar_url ?? null)
-      }
+      if (!uid) return
+
+      const { data: perfil } = await supabase
+        .from('perfis')
+        .select('full_name, username, avatar_url')
+        .eq('id', uid)
+        .single()
+
+      const nome = perfil?.full_name || perfil?.username || userData.user?.email?.split('@')[0] || ''
+      setUserName(nome)
+      setAvatarUrl(perfil?.avatar_url ?? null)
     })()
   }, [])
 
-  useEffect(() => {
-    ;(async () => {
-      const supabase = createClient()
+  if (!now) return null
 
-      const { data: provasData } = await supabase
-        .from('provas')
-        .select('id, nome, data_inicio, data_fim, status')
-        .neq('status', 'finalizada')
-        .order('data_inicio', { ascending: true })
+  const { diaSemana, dataStr } = formatarData(now)
+  const hora = formatarHora(now)
 
-      const provasList = (provasData ?? []) as ProvaRow[]
-      setProvas(provasList)
-
-      if (provasList.length > 0) {
-        const { data: etapasData } = await supabase
-          .from('etapas_planeadas')
-          .select('*')
-          .in('prova_id', provasList.map(p => p.id))
-          .order('numero_etapa', { ascending: true })
-
-        const grouped: Record<string, EtapaPlaneada[]> = {}
-        ;(etapasData ?? []).forEach((etapa: EtapaPlaneada) => {
-          if (!grouped[etapa.prova_id]) grouped[etapa.prova_id] = []
-          grouped[etapa.prova_id].push(etapa)
-        })
-        setEtapasPorProva(grouped)
-      }
-
-      setLoading(false)
-    })()
-  }, [])
-
-  const competicoes = useMemo<Competicao[]>(() => {
-    const lista = provas.map(prova => {
-      const daysLeft = diasAte(prova.data_inicio)
-      const isOngoing = prova.status === 'fechada'
-      return {
-        id: prova.id,
-        name: prova.nome,
-        startDate: formatDateShort(prova.data_inicio),
-        endDate: formatDateShort(prova.data_fim),
-        daysLeft,
-        isOngoing,
-        urgent: daysLeft > 0 && daysLeft <= 7,
-        disabled: prova.status !== 'aberta',
-        stagesDetails: etapasPorProva[prova.id] ?? [],
-      }
-    })
-
-    return lista.sort((a, b) => (a.isOngoing ? -1 : a.daysLeft) - (b.isOngoing ? -1 : b.daysLeft))
-  }, [provas, etapasPorProva])
-
-  if (loading) return null
+  const diffMs = Math.max(0, proximaEtapa.inicioEm.getTime() - now.getTime())
+  const horasFaltam = Math.floor(diffMs / (1000 * 60 * 60))
+  const minutosFaltam = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+  const segundosFaltam = Math.floor((diffMs % (1000 * 60)) / 1000)
 
   return (
     <div className="min-h-screen bg-bg">
@@ -196,7 +151,7 @@ export default function ProximasPage() {
           <span>Tour · 2026</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
-          <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden">
+          <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden cursor-pointer">
             {avatarUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -205,106 +160,87 @@ export default function ProximasPage() {
         </div>
       </header>
 
+      {/* Conteúdo */}
       <div className="max-w-[560px] mx-auto px-5 py-5">
-        <div className="eyebrow mb-2">Calendário</div>
-        <div className="display-lg mb-5">Próximas provas</div>
+        <div className="eyebrow mb-3">{diaSemana}, {dataStr} · {hora}</div>
+        <div className="display-2xl mb-2">Olá, {userName || '...'}.</div>
+        <div className="text-sm text-text-dim mb-6">
+          Faltam {horasFaltam}h {minutosFaltam}m para o início da etapa
+        </div>
 
-        {competicoes.length === 0 ? (
+        {/* Card hero */}
+        <div className="card-hero mb-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="eyebrow eyebrow-on-ink">Próxima etapa · Etapa {proximaEtapa.numero}</div>
+              <div className="display-xl mt-2.5" style={{ fontSize: 26 }}>{proximaEtapa.nome}</div>
+            </div>
+            <span className={`badge-status ${badgeClass(proximaEtapa.status)}`}>
+              <span className="dot" />{proximaEtapa.status}
+            </span>
+          </div>
+
+          <div className="divider" />
+
+          <div className="flex justify-center gap-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="eyebrow eyebrow-on-ink">Dist.</div>
+              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
+                {proximaEtapa.distancia}<span className="stat-unit text-on-ink-dim ml-1">km</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center text-center border-l border-on-ink-border pl-6">
+              <div className="eyebrow eyebrow-on-ink">Asc.</div>
+              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
+                {proximaEtapa.elevacao}<span className="stat-unit text-on-ink-dim ml-1">m</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          <div className="flex justify-center gap-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="eyebrow eyebrow-on-ink">Início da etapa</div>
+              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 20 }}>{proximaEtapa.horaInicio}</div>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="eyebrow eyebrow-on-ink">Faltam</div>
+              <div className="stat-md text-gold mt-1" style={{ fontSize: 20 }}>
+                {horasFaltam}:{String(minutosFaltam).padStart(2, '0')}:{String(segundosFaltam).padStart(2, '0')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-sm font-semibold text-text-dim mt-8 mb-4">
+          Classificação Top 20 — Geral da etapa
+        </div>
+
+        {classificacaoTop20.length === 0 ? (
           <div className="table-wrapper text-center py-10 px-5">
-            <div className="text-text-sub text-sm">Sem próximas provas previstas</div>
+            <div className="text-text-sub text-sm">Ainda sem resultados</div>
           </div>
         ) : (
-          <div className="bg-surface border border-border rounded-lg overflow-hidden">
-            {competicoes.map((comp, i) => {
-              const isExpanded = expandedId === comp.id
-              const hasStages = comp.stagesDetails.length > 0
-              let acumulado = 0
-
-              return (
-                <div key={comp.id}>
-                  <div
-                    className={`flex items-center gap-4 px-5 py-3.5 border-b border-border ${i % 2 === 1 ? 'bg-surface-2' : ''} ${hasStages ? 'cursor-pointer' : ''}`}
-                    onClick={() => hasStages && setExpandedId(isExpanded ? null : comp.id)}
-                  >
-                    <div className="mono text-xs text-text-dim flex-shrink-0" style={{ minWidth: 66 }}>
-                      {comp.startDate} – {comp.endDate}
-                    </div>
-                    <div className="flex-1 text-sm font-semibold min-w-0 truncate">{comp.name}</div>
-
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {comp.isOngoing ? (
-                        <span className="badge-status badge-a-decorrer">
-                          <span className="dot" />A decorrer
-                        </span>
-                      ) : (
-                        <div className={`mono text-sm font-bold text-right ${comp.urgent ? 'text-gold-strong' : 'text-text'}`} style={{ minWidth: 60 }}>
-                          Faltam {comp.daysLeft}
-                        </div>
-                      )}
-                      <button
-                        className="btn-primary text-xs px-3.5 py-2"
-                        disabled={comp.disabled}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        Apostar
-                      </button>
-                    </div>
-
-                    {hasStages && <ChevronIcon expanded={isExpanded} />}
-                  </div>
-
-                  {isExpanded && hasStages && (
-                    <div className="px-5 py-4 bg-surface-3 border-b border-border">
-                      <div
-                        className="flex items-center gap-2 mb-3 cursor-pointer"
-                        onClick={() => setExpandedId(null)}
-                      >
-                        <ChevronIcon expanded={true} />
-                        <div className="display-lg" style={{ fontSize: 14 }}>{comp.stagesDetails.length} Etapas</div>
-                      </div>
-
-                      <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-                        {comp.stagesDetails.map(stage => {
-                          acumulado += stage.distancia_km ?? 0
-                          const stageKey = `${comp.id}-${stage.numero_etapa}`
-                          const stageExpanded = !!expandedStages[stageKey]
-                          const acumuladoAteAqui = acumulado
-
-                          return (
-                            <div key={stage.id} className="py-3 border-b border-border last:border-b-0">
-                              <div
-                                className="flex items-center justify-between gap-3 cursor-pointer"
-                                onClick={() => setExpandedStages(s => ({ ...s, [stageKey]: !s[stageKey] }))}
-                              >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <div className="mono text-xs font-bold" style={{ minWidth: 24 }}>E{stage.numero_etapa}</div>
-                                  <div className="text-sm font-medium truncate">{stage.perfil ?? '—'}</div>
-                                </div>
-                                <div className="mono text-xs text-text-dim flex-shrink-0">{stage.distancia_km ?? '—'} km</div>
-                                <ChevronIcon expanded={stageExpanded} />
-                              </div>
-
-                              {stageExpanded && (
-                                <div className="flex gap-6 mt-2 pl-9">
-                                  <div>
-                                    <div className="eyebrow" style={{ fontSize: 9 }}>Distância</div>
-                                    <div className="mono text-sm font-bold mt-0.5">{stage.distancia_km ?? '—'} km</div>
-                                  </div>
-                                  <div>
-                                    <div className="eyebrow" style={{ fontSize: 9 }}>Acumulado</div>
-                                    <div className="mono text-sm font-bold mt-0.5">{acumuladoAteAqui} km</div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pos.</th>
+                  <th>Ciclista</th>
+                  <th>Tempo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classificacaoTop20.map(row => (
+                  <tr key={row.posicao}>
+                    <td className={`mono font-extrabold ${medalClass(row.posicao)}`}>{row.posicao}</td>
+                    <td className="font-semibold">{row.nome}</td>
+                    <td className="mono font-semibold">{row.tempo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -312,9 +248,8 @@ export default function ProximasPage() {
       {/* Bottom tab bar */}
       <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
         {TABS.map(tab => {
-          const active = tab.label === 'Próximas'
           const content = (
-            <div className={`flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${active ? 'active' : ''}`}>
+            <div className={`flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${tab.active ? 'active' : ''}`}>
               <tab.icon />
               <div>{tab.label}</div>
             </div>
