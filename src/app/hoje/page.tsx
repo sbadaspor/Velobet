@@ -111,6 +111,7 @@ type EtapaRow = {
 type ProximaEtapa = {
   numero: number
   titulo: string
+  perfil: string | null
   distancia: number | null
   elevacao: number | null
   status: 'Brevemente' | 'A decorrer'
@@ -193,6 +194,7 @@ export default function HojePage() {
     return {
       numero: candidata.numero_etapa,
       titulo: candidata.local_chegada || `Etapa ${candidata.numero_etapa}`,
+      perfil: candidata.perfil,
       distancia: candidata.distancia_km,
       elevacao: candidata.elevacao_m,
       status: isHoje || prova?.status === 'fechada' ? 'A decorrer' : 'Brevemente',
@@ -257,6 +259,9 @@ export default function HojePage() {
             <div className="flex justify-between items-start">
               <div>
                 <div className="eyebrow eyebrow-on-ink">Próxima etapa · Etapa {proximaEtapa.numero}</div>
+                {proximaEtapa.perfil && (
+                  <div className="eyebrow eyebrow-on-ink mt-1">{proximaEtapa.perfil}</div>
+                )}
                 <div className="display-xl mt-2.5" style={{ fontSize: 26 }}>{proximaEtapa.titulo}</div>
               </div>
               <span className={`badge-status ${badgeClass(proximaEtapa.status)}`}>
