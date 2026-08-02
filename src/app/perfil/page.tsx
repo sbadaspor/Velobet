@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const LOCALIDADES = [
-  'Lisboa', 'Porto', 'Braga', 'Coimbra', 'Faro',
-  'Aveiro', 'Setúbal', 'Viseu', 'Leiria', 'Évora',
+  'Aveiro', 'Beja', 'Braga', 'Bragança', 'Castelo Branco', 'Coimbra',
+  'Évora', 'Faro', 'Guarda', 'Leiria', 'Lisboa', 'Portalegre',
+  'Porto', 'Santarém', 'Setúbal', 'Viana do Castelo', 'Vila Real', 'Viseu',
 ]
 
 const NACIONALIDADES = [
@@ -204,9 +205,14 @@ export default function PerfilPage() {
       avatarUrl = `${pub.publicUrl}?t=${Date.now()}`
     }
 
+    // upsert (não update) — se por algum motivo ainda não existir uma
+    // linha em perfis para este utilizador (ex: o trigger de signup
+    // falhou), update() não afeta nenhuma linha e falha em silêncio.
+    // upsert cria a linha se não existir, e atualiza se já existir.
     const { data, error } = await supabase
       .from('perfis')
-      .update({
+      .upsert({
+        id: userId,
         full_name: nome.trim(),
         username: username.trim(),
         data_nascimento: dataNascimento,
@@ -215,13 +221,13 @@ export default function PerfilPage() {
         telefone: telefone.trim(),
         avatar_url: avatarUrl,
       })
-      .eq('id', userId)
       .select()
       .single()
 
     setSaving(false)
 
     if (error) {
+      console.error('Erro ao guardar perfil:', error)
       if (error.code === '23505') {
         setSaveError('Esse nome de utilizador já está em uso.')
       } else {
