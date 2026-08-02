@@ -1,0 +1,10 @@
+{
+  "name": "Velobet",
+  "short_name": "Velobet",
+  "description": "Sistema de apostas de ciclismo entre amigos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6F4EE",
+  "theme_color": "#F6F4EE",
+  "orientation": "portrait"
+}
