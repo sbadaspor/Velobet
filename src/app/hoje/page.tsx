@@ -100,10 +100,20 @@ export default function HojePage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      const nome = data.user?.user_metadata?.username || data.user?.email?.split('@')[0] || ''
+    ;(async () => {
+      const { data: userData } = await supabase.auth.getUser()
+      const uid = userData.user?.id
+      if (!uid) return
+
+      const { data: perfil } = await supabase
+        .from('perfis')
+        .select('full_name, username')
+        .eq('id', uid)
+        .single()
+
+      const nome = perfil?.full_name || perfil?.username || userData.user?.email?.split('@')[0] || ''
       setUserName(nome)
-    })
+    })()
   }, [])
 
   if (!now) return null
