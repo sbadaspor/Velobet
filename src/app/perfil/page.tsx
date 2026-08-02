@@ -56,11 +56,6 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 10.26 23.77 10.26 17.39 15.04 20.49 23.31 12 18.54 3.51 23.31 6.61 15.04 0.23 10.26 8.91 10.26 12 2" />
   </svg>
 )
-const ListIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-  </svg>
-)
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -78,7 +73,6 @@ const TABS: { label: string; icon: () => React.ReactElement; href: string | null
   { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
   { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
-  { label: 'Histórico', icon: ListIcon, href: null },
   { label: 'Eu', icon: UserIcon, href: '/perfil' },
 ]
 
@@ -101,6 +95,7 @@ export default function PerfilPage() {
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -262,8 +257,19 @@ export default function PerfilPage() {
     <div className="min-h-screen bg-bg">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
-        <div className="flex-1 flex items-center">
-          <button className="text-xl text-text" aria-label="Menu">☰</button>
+        <div className="flex-1 flex items-center relative">
+          <button className="text-xl text-text" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
+              <div className="absolute top-full left-0 mt-2 z-30 bg-surface border border-border rounded-lg shadow-sm py-1.5 min-w-[180px]">
+                <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm font-medium text-text-sub cursor-not-allowed">
+                  Histórico
+                  <span className="mono text-[9px] uppercase tracking-wide text-text-muted">Brevemente</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
           <span className="w-3 h-3 rounded-full bg-gold" />
