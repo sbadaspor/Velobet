@@ -202,6 +202,7 @@ export default function HistoricoPage() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarMap, setAvatarMap] = useState<Record<string, string | null>>({})
 
   useEffect(() => {
     ;(async () => {
@@ -218,10 +219,17 @@ export default function HistoricoPage() {
     ;(async () => {
       const supabase = createClient()
 
-      const [{ data: histData }, { data: provasData }] = await Promise.all([
+      const [{ data: histData }, { data: provasData }, { data: perfisData }] = await Promise.all([
         supabase.from('apostas_historicas').select('*'),
         supabase.from('provas').select('id, nome, categoria, status').eq('status', 'finalizada'),
+        supabase.from('perfis').select('username, avatar_url'),
       ])
+
+      const avatarByUsername: Record<string, string | null> = {}
+      ;((perfisData ?? []) as { username: string; avatar_url: string | null }[]).forEach(p => {
+        avatarByUsername[p.username] = p.avatar_url
+      })
+      setAvatarMap(avatarByUsername)
 
       const editionsMap = new Map<string, Edition>()
 
@@ -434,23 +442,6 @@ export default function HistoricoPage() {
               <div className="text-sm text-text-dim mb-3">
                 Todas as Grandes Voltas disputadas — desde {rivalidade?.firstYear}.
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center py-3 rounded-md bg-surface-3">
-                  <div className="mono text-lg font-bold">{rivalidade?.giroCount ?? 0}</div>
-                  <div className="text-lg">🇮🇹</div>
-                  <div className="mono text-[10px] uppercase tracking-wide text-text-dim">Giros</div>
-                </div>
-                <div className="text-center py-3 rounded-md bg-surface-3">
-                  <div className="mono text-lg font-bold">{rivalidade?.tourCount ?? 0}</div>
-                  <div className="text-lg">🇫🇷</div>
-                  <div className="mono text-[10px] uppercase tracking-wide text-text-dim">Tours</div>
-                </div>
-                <div className="text-center py-3 rounded-md bg-surface-3">
-                  <div className="mono text-lg font-bold">{rivalidade?.vueltaCount ?? 0}</div>
-                  <div className="text-lg">🇪🇸</div>
-                  <div className="mono text-[10px] uppercase tracking-wide text-text-dim">Vueltas</div>
-                </div>
-              </div>
             </div>
 
             {/* Confronto Geral */}
@@ -463,7 +454,12 @@ export default function HistoricoPage() {
                     className={`flex-shrink-0 w-[110px] flex flex-col items-center text-center pr-3 relative ${i !== ranking.length - 1 ? 'border-r border-border' : ''}`}
                   >
                     <div className="h-1 w-full mb-3 rounded-sm" style={{ background: rider.color }} />
-                    <div className="w-12 h-12 rounded-full bg-surface-3 border-2 border-border mb-2" />
+                    <div className="w-12 h-12 rounded-full bg-surface-3 border-2 border-border mb-2 overflow-hidden">
+                      {avatarMap[rider.username] && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatarMap[rider.username]!} alt="" className="w-full h-full object-cover" />
+                      )}
+                    </div>
                     <div className="text-sm font-semibold mb-1.5 px-1">{rider.name}</div>
                     <div
                       className="mono text-[9px] font-semibold px-2 py-0.5 rounded-full mb-2"
