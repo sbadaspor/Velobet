@@ -92,6 +92,42 @@ type StandingEntry = {
   apostasTop: string[]
   resultadoTop: string[]
   camisolas: CamisolaComparacao[] | null
+  // Critérios de desempate (não dão pontos, só decidem a ordem em caso de
+  // empate em pontos_total) — mesma ordem usada na Classificação/Regras:
+  // posições exatas (total → Top-10 → Top-20) e depois camisolas certas.
+  acertosExatos: number
+  acertosExatosTop10: number
+  acertosExatosTop20: number
+  acertosCamisolas: number
+}
+
+/** Conta posições exatas (mesmo ciclista, mesmo índice) e camisolas certas,
+ * para desempatar apostadores com o mesmo pontos_total — independente do
+ * "sistema" (antigo/novo), já que uma posição exata é sempre bem definida. */
+function contarDesempate(apostasTop: string[], resultadoTop: string[], camisolas: CamisolaComparacao[] | null) {
+  let exatoTop10 = 0
+  let exatoTop20 = 0
+  for (let i = 0; i < apostasTop.length; i++) {
+    const bet = apostasTop[i]
+    const real = resultadoTop[i]
+    if (bet && real && bet.trim().toLowerCase() === real.trim().toLowerCase()) {
+      if (i < 10) exatoTop10++
+      else exatoTop20++
+    }
+  }
+  const acertosCamisolas = camisolas
+    ? camisolas.filter(c => c.apostada && c.real && c.apostada.trim().toLowerCase() === c.real.trim().toLowerCase()).length
+    : 0
+  return { acertosExatos: exatoTop10 + exatoTop20, acertosExatosTop10: exatoTop10, acertosExatosTop20: exatoTop20, acertosCamisolas }
+}
+
+function compararStandings(a: StandingEntry, b: StandingEntry): number {
+  if (b.points !== a.points) return b.points - a.points
+  if (b.acertosExatos !== a.acertosExatos) return b.acertosExatos - a.acertosExatos
+  if (b.acertosExatosTop10 !== a.acertosExatosTop10) return b.acertosExatosTop10 - a.acertosExatosTop10
+  if (b.acertosExatosTop20 !== a.acertosExatosTop20) return b.acertosExatosTop20 - a.acertosExatosTop20
+  if (b.acertosCamisolas !== a.acertosCamisolas) return b.acertosCamisolas - a.acertosCamisolas
+  return a.name.localeCompare(b.name)
 }
 
 type Edition = {
@@ -196,17 +232,20 @@ export default function HistoricoPage() {
         if (!raceKey) continue
         const key = `${raceKey}-${row.ano}`
         if (!editionsMap.has(key)) editionsMap.set(key, { raceKey, year: row.ano, standings: [] })
+        const camisolas = buildCamisolas(
+          row.camisola_sprint_apostada, row.camisola_sprint_real,
+          row.camisola_montanha_apostada, row.camisola_montanha_real,
+          row.camisola_juventude_apostada, row.camisola_juventude_real
+        )
+        const desempate = contarDesempate(row.apostas_top, row.resultado_real_top, camisolas)
         editionsMap.get(key)!.standings.push({
           username: row.username,
           name: row.full_name || row.username,
           points: row.pontos_total,
           apostasTop: row.apostas_top,
           resultadoTop: row.resultado_real_top,
-          camisolas: buildCamisolas(
-            row.camisola_sprint_apostada, row.camisola_sprint_real,
-            row.camisola_montanha_apostada, row.camisola_montanha_real,
-            row.camisola_juventude_apostada, row.camisola_juventude_real
-          ),
+          camisolas,
+          ...desempate,
         })
       }
 
@@ -261,12 +300,16 @@ export default function HistoricoPage() {
               c.aposta.camisola_montanha, latest.camisola_montanha,
               c.aposta.camisola_juventude, latest.camisola_juventude
             ),
+            acertosExatos: c.calc.acertos_exatos,
+            acertosExatosTop10: c.calc.acertos_exatos_top10,
+            acertosExatosTop20: c.calc.acertos_exatos_top20,
+            acertosCamisolas: c.calc.acertos_camisolas,
           })),
         })
       }
 
       for (const ed of editionsMap.values()) {
-        ed.standings.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+        ed.standings.sort(compararStandings)
       }
 
       const raceOrder: Record<RaceKey, number> = { giro: 0, tour: 1, vuelta: 2 }
