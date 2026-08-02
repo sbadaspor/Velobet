@@ -222,7 +222,7 @@ export default function HistoricoPage() {
       const [{ data: histData }, { data: provasData }, { data: perfisData }] = await Promise.all([
         supabase.from('apostas_historicas').select('*'),
         supabase.from('provas').select('id, nome, categoria, status').eq('status', 'finalizada'),
-        supabase.from('perfis').select('username, avatar_url'),
+        supabase.from('perfis_publicos').select('username, avatar_url'),
       ])
 
       const avatarByUsername: Record<string, string | null> = {}
@@ -460,7 +460,7 @@ export default function HistoricoPage() {
                         <img src={avatarMap[rider.username]!} alt="" className="w-full h-full object-cover" />
                       )}
                     </div>
-                    <div className="text-sm font-semibold mb-1.5 px-1">{rider.name}</div>
+                    <div className="text-sm font-semibold mb-1.5 px-1 w-full truncate">{rider.name}</div>
                     <div
                       className="mono text-[9px] font-semibold px-2 py-0.5 rounded-full mb-2"
                       style={{ background: 'var(--gold-soft)', color: 'var(--gold-ink)' }}
