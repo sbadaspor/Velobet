@@ -67,6 +67,8 @@ type EtapaPlaneada = {
   perfil: string | null
   distancia_km: number | null
   elevacao_m: number | null
+  local_partida: string | null
+  local_chegada: string | null
 }
 
 type Competicao = {
@@ -284,7 +286,16 @@ export default function ProximasPage() {
                               >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                   <div className="mono text-xs font-bold" style={{ minWidth: 24 }}>E{stage.numero_etapa}</div>
-                                  <div className="text-sm font-medium truncate">{stage.perfil ?? '—'}</div>
+                                  <div className="text-sm font-medium truncate">
+                                    {stage.local_partida && stage.local_chegada ? (
+                                      <>
+                                        {stage.local_partida} → {stage.local_chegada}
+                                        {stage.perfil && <span className="text-xs text-text-dim font-normal ml-1.5">({stage.perfil})</span>}
+                                      </>
+                                    ) : (
+                                      stage.perfil ?? '—'
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="mono text-xs text-text-dim flex-shrink-0">{stage.distancia_km ?? '—'} km</div>
                                 <ChevronIcon expanded={stageExpanded} />
