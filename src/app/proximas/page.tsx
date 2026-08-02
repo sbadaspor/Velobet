@@ -105,6 +105,19 @@ export default function ProximasPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
   const [menuOpen, setMenuOpen] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      const supabase = createClient()
+      const { data: userData } = await supabase.auth.getUser()
+      const uid = userData.user?.id
+      if (uid) {
+        const { data: perfil } = await supabase.from('perfis').select('avatar_url').eq('id', uid).single()
+        setAvatarUrl(perfil?.avatar_url ?? null)
+      }
+    })()
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -183,7 +196,12 @@ export default function ProximasPage() {
           <span>Tour · 2026</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
-          <div className="w-10 h-10 rounded-full bg-surface-3 border-2 border-border" />
+          <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden">
+            {avatarUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            )}
+          </Link>
         </div>
       </header>
 
