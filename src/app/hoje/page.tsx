@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -9,23 +9,6 @@ const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
-
-// TODO: substituir por dados reais da tabela `provas`/`etapas` do Supabase
-// quando a próxima etapa e a classificação estiverem disponíveis.
-const proximaEtapa = {
-  numero: 8,
-  nome: 'Colombey-les-Deux-Églises',
-  distancia: 198,
-  elevacao: 2140,
-  horaInicio: '14:30',
-  status: 'Brevemente' as 'Brevemente' | 'A decorrer' | 'Finalizada',
-  inicioEm: (() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(14, 30, 0, 0)
-    return d
-  })(),
-}
 
 // Vazio até a etapa finalizar e existirem resultados reais.
 const classificacaoTop20: { posicao: number; nome: string; tempo: string }[] = []
@@ -39,6 +22,24 @@ function formatarData(date: Date) {
 
 function formatarHora(date: Date) {
   return date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+}
+
+function isoHoje() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function parseISODate(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function diasAte(iso: string) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = parseISODate(iso)
+  target.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function badgeClass(status: string) {
@@ -87,11 +88,44 @@ const TABS: { label: string; icon: () => React.ReactElement; active: boolean; hr
   { label: 'Eu', icon: UserIcon, active: false, href: '/perfil' },
 ]
 
+type ProvaRow = {
+  id: string
+  nome: string
+  data_inicio: string
+  data_fim: string
+  status: 'aberta' | 'fechada' | 'finalizada'
+}
+
+type EtapaRow = {
+  id: string
+  prova_id: string
+  numero_etapa: number
+  perfil: string | null
+  distancia_km: number | null
+  elevacao_m: number | null
+  local_partida: string | null
+  local_chegada: string | null
+  data_etapa: string
+}
+
+type ProximaEtapa = {
+  numero: number
+  titulo: string
+  distancia: number | null
+  elevacao: number | null
+  status: 'Brevemente' | 'A decorrer'
+  daysLeft: number
+}
+
 export default function HojePage() {
   const [now, setNow] = useState<Date | null>(null)
   const [userName, setUserName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  const [dadosCarregados, setDadosCarregados] = useState(false)
+  const [provas, setProvas] = useState<ProvaRow[]>([])
+  const [etapas, setEtapas] = useState<EtapaRow[]>([])
 
   useEffect(() => {
     setNow(new Date())
@@ -118,18 +152,61 @@ export default function HojePage() {
     })()
   }, [])
 
-  if (!now) return null
+  useEffect(() => {
+    const supabase = createClient()
+    ;(async () => {
+      const { data: provasData } = await supabase
+        .from('provas')
+        .select('id, nome, data_inicio, data_fim, status')
+        .neq('status', 'finalizada')
+        .order('data_inicio', { ascending: true })
+
+      const provasList = (provasData ?? []) as ProvaRow[]
+      setProvas(provasList)
+
+      if (provasList.length > 0) {
+        const { data: etapasData } = await supabase
+          .from('etapas_planeadas')
+          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa')
+          .in('prova_id', provasList.map(p => p.id))
+          .order('data_etapa', { ascending: true })
+
+        setEtapas((etapasData ?? []) as EtapaRow[])
+      }
+
+      setDadosCarregados(true)
+    })()
+  }, [])
+
+  const proximaEtapa = useMemo<ProximaEtapa | null>(() => {
+    const hoje = isoHoje()
+    const candidatas = etapas
+      .filter(e => e.data_etapa >= hoje)
+      .sort((a, b) => (a.data_etapa < b.data_etapa ? -1 : a.data_etapa > b.data_etapa ? 1 : a.numero_etapa - b.numero_etapa))
+
+    const candidata = candidatas[0]
+    if (!candidata) return null
+
+    const prova = provas.find(p => p.id === candidata.prova_id)
+    const isHoje = candidata.data_etapa === hoje
+
+    return {
+      numero: candidata.numero_etapa,
+      titulo: candidata.local_chegada || `Etapa ${candidata.numero_etapa}`,
+      distancia: candidata.distancia_km,
+      elevacao: candidata.elevacao_m,
+      status: isHoje || prova?.status === 'fechada' ? 'A decorrer' : 'Brevemente',
+      daysLeft: diasAte(candidata.data_etapa),
+    }
+  }, [etapas, provas])
+
+  if (!now || !dadosCarregados) return null
 
   const { diaSemana, dataStr } = formatarData(now)
   const hora = formatarHora(now)
 
-  const diffMs = Math.max(0, proximaEtapa.inicioEm.getTime() - now.getTime())
-  const horasFaltam = Math.floor(diffMs / (1000 * 60 * 60))
-  const minutosFaltam = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-  const segundosFaltam = Math.floor((diffMs % (1000 * 60)) / 1000)
-
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
         <div className="flex-1 flex items-center relative">
@@ -163,57 +240,52 @@ export default function HojePage() {
       </header>
 
       {/* Conteúdo */}
-      <div className="max-w-[560px] mx-auto px-5 py-5">
+      <div className="max-w-[560px] mx-auto px-5 py-5 flex-1 w-full">
         <div className="eyebrow mb-3">{diaSemana}, {dataStr} · {hora}</div>
         <div className="display-2xl mb-2">Olá, {userName || '...'}.</div>
         <div className="text-sm text-text-dim mb-6">
-          Faltam {horasFaltam}h {minutosFaltam}m para o início da etapa
+          {proximaEtapa
+            ? proximaEtapa.daysLeft <= 0
+              ? 'A etapa é hoje'
+              : `Faltam ${proximaEtapa.daysLeft} dia${proximaEtapa.daysLeft === 1 ? '' : 's'} para a próxima etapa`
+            : 'Sem etapas agendadas'}
         </div>
 
         {/* Card hero */}
-        <div className="card-hero mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="eyebrow eyebrow-on-ink">Próxima etapa · Etapa {proximaEtapa.numero}</div>
-              <div className="display-xl mt-2.5" style={{ fontSize: 26 }}>{proximaEtapa.nome}</div>
-            </div>
-            <span className={`badge-status ${badgeClass(proximaEtapa.status)}`}>
-              <span className="dot" />{proximaEtapa.status}
-            </span>
-          </div>
-
-          <div className="divider" />
-
-          <div className="flex justify-center gap-6">
-            <div className="flex flex-col items-center text-center">
-              <div className="eyebrow eyebrow-on-ink">Dist.</div>
-              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
-                {proximaEtapa.distancia}<span className="stat-unit text-on-ink-dim ml-1">km</span>
+        {proximaEtapa ? (
+          <div className="card-hero mb-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="eyebrow eyebrow-on-ink">Próxima etapa · Etapa {proximaEtapa.numero}</div>
+                <div className="display-xl mt-2.5" style={{ fontSize: 26 }}>{proximaEtapa.titulo}</div>
               </div>
+              <span className={`badge-status ${badgeClass(proximaEtapa.status)}`}>
+                <span className="dot" />{proximaEtapa.status}
+              </span>
             </div>
-            <div className="flex flex-col items-center text-center border-l border-on-ink-border pl-6">
-              <div className="eyebrow eyebrow-on-ink">Asc.</div>
-              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
-                {proximaEtapa.elevacao}<span className="stat-unit text-on-ink-dim ml-1">m</span>
+
+            <div className="divider" />
+
+            <div className="flex justify-center gap-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="eyebrow eyebrow-on-ink">Dist.</div>
+                <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
+                  {proximaEtapa.distancia ?? '—'}<span className="stat-unit text-on-ink-dim ml-1">km</span>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div className="divider" />
-
-          <div className="flex justify-center gap-8">
-            <div className="flex flex-col items-center text-center">
-              <div className="eyebrow eyebrow-on-ink">Início da etapa</div>
-              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 20 }}>{proximaEtapa.horaInicio}</div>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <div className="eyebrow eyebrow-on-ink">Faltam</div>
-              <div className="stat-md text-gold mt-1" style={{ fontSize: 20 }}>
-                {horasFaltam}:{String(minutosFaltam).padStart(2, '0')}:{String(segundosFaltam).padStart(2, '0')}
+              <div className="flex flex-col items-center text-center border-l border-on-ink-border pl-6">
+                <div className="eyebrow eyebrow-on-ink">Asc.</div>
+                <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
+                  {proximaEtapa.elevacao ?? '—'}<span className="stat-unit text-on-ink-dim ml-1">m</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="table-wrapper text-center py-10 px-5 mb-6">
+            <div className="text-text-sub text-sm">Sem etapas agendadas</div>
+          </div>
+        )}
 
         <div className="text-sm font-semibold text-text-dim mt-8 mb-4">
           Classificação Top 20 — Geral da etapa
