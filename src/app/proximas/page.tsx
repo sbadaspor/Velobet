@@ -66,6 +66,7 @@ type EtapaPlaneada = {
   numero_etapa: number
   perfil: string | null
   distancia_km: number | null
+  elevacao_m: number | null
 }
 
 type Competicao = {
@@ -220,7 +221,6 @@ export default function ProximasPage() {
             {competicoes.map((comp, i) => {
               const isExpanded = expandedId === comp.id
               const hasStages = comp.stagesDetails.length > 0
-              let acumulado = 0
 
               return (
                 <div key={comp.id}>
@@ -267,10 +267,8 @@ export default function ProximasPage() {
 
                       <div style={{ maxHeight: 400, overflowY: 'auto' }}>
                         {comp.stagesDetails.map(stage => {
-                          acumulado += stage.distancia_km ?? 0
                           const stageKey = `${comp.id}-${stage.numero_etapa}`
                           const stageExpanded = !!expandedStages[stageKey]
-                          const acumuladoAteAqui = acumulado
 
                           return (
                             <div key={stage.id} className="py-3 border-b border-border last:border-b-0">
@@ -294,7 +292,7 @@ export default function ProximasPage() {
                                   </div>
                                   <div>
                                     <div className="eyebrow" style={{ fontSize: 9 }}>Acumulado</div>
-                                    <div className="mono text-sm font-bold mt-0.5">{acumuladoAteAqui} km</div>
+                                    <div className="mono text-sm font-bold mt-0.5">{stage.elevacao_m ?? '—'} m</div>
                                   </div>
                                 </div>
                               )}
