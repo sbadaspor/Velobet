@@ -153,13 +153,26 @@
   .card-hero .divider { border-top: 1px solid var(--on-ink-border); margin: 18px 0; }
 
   .input-field {
-    width: 100%; border-radius: var(--radius-md); font-size: 0.9rem;
+    width: 100%; min-width: 0; box-sizing: border-box;
+    border-radius: var(--radius-md); font-size: 0.9rem;
     background: var(--surface); border: 1px solid var(--border);
     color: var(--text); padding: 0.75rem 1rem; transition: all 0.15s ease;
     font-family: 'Archivo', sans-serif;
+    -webkit-appearance: none; appearance: none;
   }
   .input-field::placeholder { color: var(--text-sub); }
   .input-field:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 3px rgba(22,20,15,0.08); }
+
+  /* iOS Safari dá aos inputs type="date" uma largura mínima própria que
+     ignora width:100% e empurra a barra para fora do ecrã — min-width:0
+     acima resolve isso. -webkit-appearance:none tira o estilo nativo
+     estranho da caixa mas mantém o seletor de data ao tocar. */
+  .input-field[type='date'] {
+    color: var(--text);
+  }
+  .input-field[type='date']::-webkit-date-and-time-value {
+    text-align: left;
+  }
 
   /* ── Badges de estado ── */
   .badge-status {
