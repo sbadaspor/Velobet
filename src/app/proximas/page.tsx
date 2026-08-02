@@ -183,13 +183,12 @@ export default function ProximasPage() {
             <>
               <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
               <div className="absolute top-full left-0 mt-2 z-30 bg-surface border border-border rounded-lg shadow-sm py-1.5 min-w-[200px]">
+                <Link href="/historico" className="block px-4 py-2.5 text-sm font-medium text-text hover:bg-surface-2" onClick={() => setMenuOpen(false)}>
+                  Histórico
+                </Link>
                 <Link href="/regras" className="block px-4 py-2.5 text-sm font-medium text-text hover:bg-surface-2" onClick={() => setMenuOpen(false)}>
                   Regras & Pontuação
                 </Link>
-                <div className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm font-medium text-text-sub cursor-not-allowed">
-                  Histórico
-                  <span className="mono text-[9px] uppercase tracking-wide text-text-muted">Brevemente</span>
-                </div>
               </div>
             </>
           )}
