@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
@@ -84,12 +85,12 @@ const UserIcon = () => (
   </svg>
 )
 
-const TABS = [
-  { label: 'Hoje', icon: HomeIcon, active: true },
-  { label: 'Próximas', icon: CalendarIcon, active: false },
-  { label: 'Classificação', icon: StarIcon, active: false },
-  { label: 'Histórico', icon: ListIcon, active: false },
-  { label: 'Eu', icon: UserIcon, active: false },
+const TABS: { label: string; icon: () => React.ReactElement; active: boolean; href: string | null }[] = [
+  { label: 'Hoje', icon: HomeIcon, active: true, href: '/hoje' },
+  { label: 'Próximas', icon: CalendarIcon, active: false, href: null },
+  { label: 'Classificação', icon: StarIcon, active: false, href: null },
+  { label: 'Histórico', icon: ListIcon, active: false, href: null },
+  { label: 'Eu', icon: UserIcon, active: false, href: '/perfil' },
 ]
 
 export default function HojePage() {
@@ -223,15 +224,23 @@ export default function HojePage() {
 
       {/* Bottom tab bar */}
       <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
-        {TABS.map(tab => (
-          <div
-            key={tab.label}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 cursor-pointer text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${tab.active ? 'active' : ''}`}
-          >
-            <tab.icon />
-            <div>{tab.label}</div>
-          </div>
-        ))}
+        {TABS.map(tab => {
+          const content = (
+            <div className={`flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${tab.active ? 'active' : ''}`}>
+              <tab.icon />
+              <div>{tab.label}</div>
+            </div>
+          )
+          return tab.href ? (
+            <Link key={tab.label} href={tab.href} className="flex-1 cursor-pointer">
+              {content}
+            </Link>
+          ) : (
+            <div key={tab.label} className="flex-1 cursor-not-allowed opacity-70">
+              {content}
+            </div>
+          )
+        })}
       </footer>
     </div>
   )
