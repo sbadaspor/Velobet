@@ -106,14 +106,13 @@
     max-width: 430px;
   }
   .page-shell {
-    height: 100vh;
-    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
     background: var(--bg);
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: 24px 16px;
-    overflow: hidden;
   }
 
   /* ── Botões ── */
