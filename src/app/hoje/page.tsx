@@ -122,7 +122,7 @@ export default function HojePage() {
 
   return (
     <div className="page-shell">
-      <div className="page-frame flex flex-col overflow-y-auto h-full">
+      <div className="page-frame flex flex-col">
 
         {/* Header */}
         <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border rounded-t-xl">
