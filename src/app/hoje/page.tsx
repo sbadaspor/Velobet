@@ -121,121 +121,118 @@ export default function HojePage() {
   const segundosFaltam = Math.floor((diffMs % (1000 * 60)) / 1000)
 
   return (
-    <div className="page-shell">
-      <div className="page-frame flex flex-col">
+    <div className="min-h-screen bg-bg">
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
+        <div className="flex-1 flex items-center">
+          <button className="text-xl text-text" aria-label="Menu">☰</button>
+        </div>
+        <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
+          <span className="w-3 h-3 rounded-full bg-gold" />
+          <span>Tour · 2026</span>
+        </div>
+        <div className="flex-1 flex items-center justify-end">
+          <div className="w-10 h-10 rounded-full bg-surface-3 border-2 border-border cursor-pointer" />
+        </div>
+      </header>
 
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border rounded-t-xl">
-          <div className="flex-1 flex items-center">
-            <button className="text-xl text-text" aria-label="Menu">☰</button>
-          </div>
-          <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
-            <span className="w-3 h-3 rounded-full bg-gold" />
-            <span>Tour · 2026</span>
-          </div>
-          <div className="flex-1 flex items-center justify-end">
-            <div className="w-10 h-10 rounded-full bg-surface-3 border-2 border-border cursor-pointer" />
-          </div>
-        </header>
-
-        {/* Conteúdo */}
-        <div className="flex-1 px-5 py-5">
-          <div className="eyebrow mb-3">{diaSemana}, {dataStr} · {hora}</div>
-          <div className="display-2xl mb-2">Olá, {userName || '...'}.</div>
-          <div className="text-sm text-text-dim mb-6">
-            Faltam {horasFaltam}h {minutosFaltam}m para o início da etapa
-          </div>
-
-          {/* Card hero */}
-          <div className="card-hero mb-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="eyebrow eyebrow-on-ink">Próxima etapa · Etapa {proximaEtapa.numero}</div>
-                <div className="display-xl mt-2.5" style={{ fontSize: 26 }}>{proximaEtapa.nome}</div>
-              </div>
-              <span className={`badge-status ${badgeClass(proximaEtapa.status)}`}>
-                <span className="dot" />{proximaEtapa.status}
-              </span>
-            </div>
-
-            <div className="divider" />
-
-            <div className="flex justify-center gap-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="eyebrow eyebrow-on-ink">Dist.</div>
-                <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
-                  {proximaEtapa.distancia}<span className="stat-unit text-on-ink-dim ml-1">km</span>
-                </div>
-              </div>
-              <div className="flex flex-col items-center text-center border-l border-on-ink-border pl-6">
-                <div className="eyebrow eyebrow-on-ink">Asc.</div>
-                <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
-                  {proximaEtapa.elevacao}<span className="stat-unit text-on-ink-dim ml-1">m</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="divider" />
-
-            <div className="flex justify-center gap-8">
-              <div className="flex flex-col items-center text-center">
-                <div className="eyebrow eyebrow-on-ink">Início da etapa</div>
-                <div className="stat-md text-on-ink mt-1" style={{ fontSize: 20 }}>{proximaEtapa.horaInicio}</div>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <div className="eyebrow eyebrow-on-ink">Faltam</div>
-                <div className="stat-md text-gold mt-1" style={{ fontSize: 20 }}>
-                  {horasFaltam}:{String(minutosFaltam).padStart(2, '0')}:{String(segundosFaltam).padStart(2, '0')}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-sm font-semibold text-text-dim mt-8 mb-4">
-            Classificação Top 20 — Geral da etapa
-          </div>
-
-          {classificacaoTop20.length === 0 ? (
-            <div className="table-wrapper text-center py-10 px-5">
-              <div className="text-text-sub text-sm">Ainda sem resultados</div>
-            </div>
-          ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Pos.</th>
-                    <th>Ciclista</th>
-                    <th>Tempo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classificacaoTop20.map(row => (
-                    <tr key={row.posicao}>
-                      <td className={`mono font-extrabold ${medalClass(row.posicao)}`}>{row.posicao}</td>
-                      <td className="font-semibold">{row.nome}</td>
-                      <td className="mono font-semibold">{row.tempo}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Conteúdo */}
+      <div className="max-w-[560px] mx-auto px-5 py-5">
+        <div className="eyebrow mb-3">{diaSemana}, {dataStr} · {hora}</div>
+        <div className="display-2xl mb-2">Olá, {userName || '...'}.</div>
+        <div className="text-sm text-text-dim mb-6">
+          Faltam {horasFaltam}h {minutosFaltam}m para o início da etapa
         </div>
 
-        {/* Bottom tab bar */}
-        <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border rounded-b-xl">
-          {TABS.map(tab => (
-            <div
-              key={tab.label}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 cursor-pointer text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${tab.active ? 'active' : ''}`}
-            >
-              <tab.icon />
-              <div>{tab.label}</div>
+        {/* Card hero */}
+        <div className="card-hero mb-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="eyebrow eyebrow-on-ink">Próxima etapa · Etapa {proximaEtapa.numero}</div>
+              <div className="display-xl mt-2.5" style={{ fontSize: 26 }}>{proximaEtapa.nome}</div>
             </div>
-          ))}
-        </footer>
+            <span className={`badge-status ${badgeClass(proximaEtapa.status)}`}>
+              <span className="dot" />{proximaEtapa.status}
+            </span>
+          </div>
+
+          <div className="divider" />
+
+          <div className="flex justify-center gap-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="eyebrow eyebrow-on-ink">Dist.</div>
+              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
+                {proximaEtapa.distancia}<span className="stat-unit text-on-ink-dim ml-1">km</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center text-center border-l border-on-ink-border pl-6">
+              <div className="eyebrow eyebrow-on-ink">Asc.</div>
+              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 22 }}>
+                {proximaEtapa.elevacao}<span className="stat-unit text-on-ink-dim ml-1">m</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          <div className="flex justify-center gap-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="eyebrow eyebrow-on-ink">Início da etapa</div>
+              <div className="stat-md text-on-ink mt-1" style={{ fontSize: 20 }}>{proximaEtapa.horaInicio}</div>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="eyebrow eyebrow-on-ink">Faltam</div>
+              <div className="stat-md text-gold mt-1" style={{ fontSize: 20 }}>
+                {horasFaltam}:{String(minutosFaltam).padStart(2, '0')}:{String(segundosFaltam).padStart(2, '0')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-sm font-semibold text-text-dim mt-8 mb-4">
+          Classificação Top 20 — Geral da etapa
+        </div>
+
+        {classificacaoTop20.length === 0 ? (
+          <div className="table-wrapper text-center py-10 px-5">
+            <div className="text-text-sub text-sm">Ainda sem resultados</div>
+          </div>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pos.</th>
+                  <th>Ciclista</th>
+                  <th>Tempo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classificacaoTop20.map(row => (
+                  <tr key={row.posicao}>
+                    <td className={`mono font-extrabold ${medalClass(row.posicao)}`}>{row.posicao}</td>
+                    <td className="font-semibold">{row.nome}</td>
+                    <td className="mono font-semibold">{row.tempo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {/* Bottom tab bar */}
+      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
+        {TABS.map(tab => (
+          <div
+            key={tab.label}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 cursor-pointer text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${tab.active ? 'active' : ''}`}
+          >
+            <tab.icon />
+            <div>{tab.label}</div>
+          </div>
+        ))}
+      </footer>
     </div>
   )
 }
