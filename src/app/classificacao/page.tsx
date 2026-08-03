@@ -273,7 +273,22 @@ export default function ClassificacaoPage() {
       setComps(results)
       setStageIdx(
         Object.fromEntries(
-          results.filter(c => c.hasStandings).map(c => [c.prova.id, c.etapas.length - 1])
+          results
+            .filter(c => c.hasStandings)
+            .map(c => {
+              // Por defeito mostra sempre a última etapa realizada (maior
+              // numero_etapa com resultados já inseridos), não apenas a
+              // última posição do array.
+              let lastIdx = 0
+              let maxNumero = -Infinity
+              c.etapas.forEach((etapa, i) => {
+                if (etapa.numero_etapa > maxNumero) {
+                  maxNumero = etapa.numero_etapa
+                  lastIdx = i
+                }
+              })
+              return [c.prova.id, lastIdx]
+            })
         )
       )
       setLoading(false)
@@ -283,7 +298,7 @@ export default function ClassificacaoPage() {
   if (loading) return null
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
         <div className="flex-1 flex items-center relative">
@@ -316,7 +331,7 @@ export default function ClassificacaoPage() {
         </div>
       </header>
 
-      <div className="max-w-[560px] mx-auto px-5 py-5">
+      <div className="flex-1 w-full max-w-[560px] mx-auto px-5 py-5">
         {comps.length === 0 ? (
           <div className="table-wrapper text-center py-10 px-5">
             <div className="text-text-sub text-sm">Não há provas a decorrer neste momento</div>
