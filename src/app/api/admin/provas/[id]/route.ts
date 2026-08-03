@@ -19,11 +19,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const { id } = await params
   const body = await req.json()
-  const { nome, categoria, status, pcs_slug, etapas } = body as {
+  const { nome, categoria, status, pcs_slug, data_inicio, data_fim, etapas } = body as {
     nome?: string
     categoria?: string
     status?: string
     pcs_slug?: string
+    data_inicio?: string
+    data_fim?: string
     etapas?: EtapaInput[]
   }
 
@@ -34,6 +36,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (categoria !== undefined) camposProva.categoria = categoria
   if (status !== undefined) camposProva.status = status
   if (pcs_slug !== undefined) camposProva.pcs_slug = pcs_slug || null
+  if (data_inicio) camposProva.data_inicio = data_inicio
+  if (data_fim) camposProva.data_fim = data_fim
 
   if (Object.keys(camposProva).length > 0) {
     const { error } = await supabase.from('provas').update(camposProva).eq('id', id)
