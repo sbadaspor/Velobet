@@ -1,0 +1,663 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
+type EtapaPlaneada = {
+  id?: string
+  numero_etapa: number | string
+  data_etapa: string | null
+  perfil: string | null
+  distancia_km: number | string | null
+  elevacao_m: number | string | null
+  local_partida: string | null
+  local_chegada: string | null
+  hora_inicio: string | null
+}
+
+type EtapaResultado = {
+  id: string
+  numero_etapa: number
+  classificacao_geral_top20: string[] | null
+  camisola_sprint: string | null
+  camisola_montanha: string | null
+  camisola_juventude: string | null
+  import_status: 'pendente' | 'sucesso' | 'falha' | null
+  import_erro: string | null
+  importado_em: string | null
+}
+
+type Prova = {
+  id: string
+  nome: string
+  categoria: string
+  status: string
+  pcs_slug: string | null
+  startlist_sync_em: string | null
+  startlist_sync_status: string | null
+  etapas_planeadas: EtapaPlaneada[]
+  etapas_resultados: EtapaResultado[]
+  startlist: { count: number; dnf: number; lastSync: string | null; lastSyncStatus: string | null }
+}
+
+type UltimaImportacao = { executado_em: string; sucesso: boolean; detalhes: string | null } | null
+
+const CATEGORIAS = ['grande_volta', 'prova_semana', 'monumento', 'prova_dia']
+const STATUSES = ['aberta', 'fechada', 'finalizada']
+
+function statusBadgeStyle(status: string) {
+  if (status === 'aberta') return { background: 'rgba(22,163,74,0.14)', color: '#146633' }
+  if (status === 'fechada') return { background: 'rgba(184,134,11,0.14)', color: '#734C06' }
+  return { background: 'rgba(107,114,128,0.14)', color: '#4B5563' }
+}
+
+function importBadge(status: string | null) {
+  if (status === 'sucesso') return { label: 'Importada', color: '#146633', bg: 'rgba(22,163,74,0.14)' }
+  if (status === 'falha') return { label: 'Falha', color: 'var(--red)', bg: 'rgba(208,69,42,0.14)' }
+  return { label: 'Pendente', color: 'var(--text-dim)', bg: 'var(--surface-3)' }
+}
+
+const emptyEtapa = (): EtapaPlaneada => ({
+  numero_etapa: '',
+  data_etapa: '',
+  perfil: '',
+  distancia_km: '',
+  elevacao_m: '',
+  local_partida: '',
+  local_chegada: '',
+  hora_inicio: '',
+})
+
+export default function AdminClient() {
+  const [loading, setLoading] = useState(true)
+  const [provas, setProvas] = useState<Prova[]>([])
+  const [ultimaImportacao, setUltimaImportacao] = useState<UltimaImportacao>(null)
+  const [activeTab, setActiveTab] = useState<'provas' | 'etapas'>('provas')
+  const [selectedProvaId, setSelectedProvaId] = useState<string | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const [showProvaModal, setShowProvaModal] = useState(false)
+  const [editingProva, setEditingProva] = useState<{
+    id?: string
+    nome: string
+    categoria: string
+    status: string
+    pcs_slug: string
+    etapas: EtapaPlaneada[]
+  } | null>(null)
+
+  const [showResultsModal, setShowResultsModal] = useState(false)
+  const [editingEtapaNumero, setEditingEtapaNumero] = useState<number | null>(null)
+  const [resultsForm, setResultsForm] = useState({ classificacao: '', sprint: '', montanha: '', juventude: '' })
+  const [savingResults, setSavingResults] = useState(false)
+
+  const [startlistPaste, setStartlistPaste] = useState('')
+  const [savingStartlist, setSavingStartlist] = useState(false)
+
+  async function carregar() {
+    setLoading(true)
+    setErro(null)
+    try {
+      const res = await fetch('/api/admin/provas')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Erro ao carregar')
+      setProvas(json.provas)
+      setUltimaImportacao(json.ultimaImportacao)
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Erro ao carregar')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    carregar()
+  }, [])
+
+  const selectedProva = provas.find(p => p.id === selectedProvaId) ?? null
+
+  function abrirCriarProva() {
+    setEditingProva({ nome: '', categoria: '', status: 'aberta', pcs_slug: '', etapas: [emptyEtapa()] })
+    setShowProvaModal(true)
+  }
+
+  function abrirEditarProva(p: Prova) {
+    setEditingProva({
+      id: p.id,
+      nome: p.nome,
+      categoria: p.categoria,
+      status: p.status,
+      pcs_slug: p.pcs_slug ?? '',
+      etapas:
+        p.etapas_planeadas.length > 0
+          ? p.etapas_planeadas
+              .slice()
+              .sort((a, b) => Number(a.numero_etapa) - Number(b.numero_etapa))
+              .map(e => ({ ...e }))
+          : [emptyEtapa()],
+    })
+    setShowProvaModal(true)
+  }
+
+  async function guardarProva() {
+    if (!editingProva) return
+    const payload = {
+      nome: editingProva.nome,
+      categoria: editingProva.categoria,
+      status: editingProva.status,
+      pcs_slug: editingProva.pcs_slug,
+      etapas: editingProva.etapas,
+    }
+    const url = editingProva.id ? `/api/admin/provas/${editingProva.id}` : '/api/admin/provas'
+    const method = editingProva.id ? 'PUT' : 'POST'
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    if (!res.ok) {
+      alert('Erro a guardar: ' + json.error)
+      return
+    }
+    setShowProvaModal(false)
+    setEditingProva(null)
+    carregar()
+  }
+
+  async function apagarProva(p: Prova) {
+    if (!confirm(`Apagar "${p.nome}"? Isto não tem volta a dar.`)) return
+    const res = await fetch(`/api/admin/provas/${p.id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) {
+      alert('Erro a apagar: ' + json.error)
+      return
+    }
+    carregar()
+  }
+
+  function selecionarProva(p: Prova) {
+    setSelectedProvaId(p.id)
+    setActiveTab('etapas')
+    setStartlistPaste('')
+  }
+
+  async function processarStartlist() {
+    if (!selectedProva || !startlistPaste.trim()) return
+    setSavingStartlist(true)
+    try {
+      const res = await fetch('/api/admin/startlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provaId: selectedProva.id, texto: startlistPaste }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro: ' + json.error)
+        return
+      }
+      alert(`Startlist processada: ${json.total} ciclistas (${json.dnf} DNF).`)
+      setStartlistPaste('')
+      carregar()
+    } finally {
+      setSavingStartlist(false)
+    }
+  }
+
+  function abrirResultados(numeroEtapa: number) {
+    setEditingEtapaNumero(numeroEtapa)
+    setResultsForm({ classificacao: '', sprint: '', montanha: '', juventude: '' })
+    setShowResultsModal(true)
+  }
+
+  async function guardarResultados() {
+    if (!selectedProva || editingEtapaNumero == null) return
+    if (!resultsForm.classificacao.trim() && !resultsForm.sprint.trim() && !resultsForm.montanha.trim() && !resultsForm.juventude.trim()) {
+      alert('Cola pelo menos um dos 4 textos.')
+      return
+    }
+    setSavingResults(true)
+    try {
+      const res = await fetch('/api/admin/resultados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provaId: selectedProva.id,
+          numeroEtapa: editingEtapaNumero,
+          ...resultsForm,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro: ' + json.error)
+        return
+      }
+      setShowResultsModal(false)
+      carregar()
+    } finally {
+      setSavingResults(false)
+    }
+  }
+
+  function atualizarEtapaForm(index: number, campo: keyof EtapaPlaneada, valor: string) {
+    if (!editingProva) return
+    const etapas = [...editingProva.etapas]
+    etapas[index] = { ...etapas[index], [campo]: valor }
+    setEditingProva({ ...editingProva, etapas })
+  }
+
+  function adicionarEtapaForm() {
+    if (!editingProva) return
+    setEditingProva({ ...editingProva, etapas: [...editingProva.etapas, emptyEtapa()] })
+  }
+
+  function removerEtapaForm(index: number) {
+    if (!editingProva) return
+    const alvo = editingProva.etapas[index]
+    if (alvo.id && !confirm('Esta etapa já tem dados guardados (ex: percurso/elevação). Remover da lista não apaga a etapa na base de dados — só não a mostra aqui. Continuar?')) {
+      return
+    }
+    setEditingProva({ ...editingProva, etapas: editingProva.etapas.filter((_, i) => i !== index) })
+  }
+
+  if (loading) return <div style={{ padding: 40 }}>A carregar…</div>
+
+  return (
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'Archivo, sans-serif', color: 'var(--text)' }}>
+      {erro && <div style={{ color: 'var(--red)', marginBottom: 16 }}>{erro}</div>}
+
+      {/* Barra de estado */}
+      <div className="card" style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div className="mono" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)' }}>
+            Última importação automática
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 4 }}>
+            {ultimaImportacao ? (
+              ultimaImportacao.sucesso ? (
+                <span style={{ color: '#146633' }}>
+                  ✓ Sucesso — <span className="mono">{new Date(ultimaImportacao.executado_em).toLocaleString('pt-PT')}</span>
+                </span>
+              ) : (
+                <span style={{ color: 'var(--red)' }}>
+                  ✗ Falha — {ultimaImportacao.detalhes} (<span className="mono">{new Date(ultimaImportacao.executado_em).toLocaleString('pt-PT')}</span>)
+                </span>
+              )
+            ) : (
+              <span style={{ color: 'var(--text-dim)' }}>Ainda não correu nenhuma importação automática.</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)' }}>
+        <button
+          onClick={() => setActiveTab('provas')}
+          style={{
+            padding: '12px 16px',
+            fontSize: 14,
+            fontWeight: 600,
+            color: activeTab === 'provas' ? 'var(--text)' : 'var(--text-dim)',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'provas' ? '2px solid var(--gold)' : '2px solid transparent',
+            cursor: 'pointer',
+          }}
+        >
+          Provas
+        </button>
+        <button
+          onClick={() => setActiveTab('etapas')}
+          style={{
+            padding: '12px 16px',
+            fontSize: 14,
+            fontWeight: 600,
+            color: activeTab === 'etapas' ? 'var(--text)' : 'var(--text-dim)',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'etapas' ? '2px solid var(--gold)' : '2px solid transparent',
+            cursor: 'pointer',
+          }}
+        >
+          Etapas
+        </button>
+      </div>
+
+      {/* Provas tab */}
+      {activeTab === 'provas' && (
+        <div>
+          <button className="btn-primary" style={{ marginBottom: 16 }} onClick={abrirCriarProva}>
+            + Criar Prova Nova
+          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {provas.map(p => (
+              <div
+                key={p.id}
+                className="card"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                onClick={() => selecionarProva(p)}
+              >
+                <div>
+                  <div className="display-lg" style={{ fontSize: 16, marginBottom: 6 }}>{p.nome}</div>
+                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-dim)' }}>
+                    <span className="mono">{p.categoria}</span>
+                    <span
+                      className="mono"
+                      style={{
+                        ...statusBadgeStyle(p.status),
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        textTransform: 'uppercase',
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    >
+                      {p.status}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+                  <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={() => abrirEditarProva(p)}>
+                    Editar
+                  </button>
+                  <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={() => apagarProva(p)}>
+                    Apagar
+                  </button>
+                </div>
+              </div>
+            ))}
+            {provas.length === 0 && <div style={{ color: 'var(--text-dim)', padding: 20 }}>Ainda não há nenhuma prova criada.</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Etapas tab */}
+      {activeTab === 'etapas' && (
+        <div>
+          {!selectedProva ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '40px 20px' }}>
+              Seleciona uma prova na aba &quot;Provas&quot; para gerir etapas.
+            </div>
+          ) : (
+            <div>
+              <button className="btn-secondary" style={{ marginBottom: 16, fontSize: 12, padding: '8px 12px' }} onClick={() => setSelectedProvaId(null)}>
+                ← Voltar
+              </button>
+              <div className="display-lg" style={{ marginBottom: 24 }}>{selectedProva.nome}</div>
+
+              {/* Startlist */}
+              <div style={{ background: 'var(--ink)', color: 'var(--on-ink)', borderRadius: 'var(--radius-lg)', padding: 20, marginBottom: 24 }}>
+                <div style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: 18, marginBottom: 16 }}>Startlist</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
+                    <div className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{selectedProva.startlist.count}</div>
+                    <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>CICLISTAS</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
+                    <div className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{selectedProva.startlist.dnf}</div>
+                    <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>DNF</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
+                    <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
+                      {selectedProva.startlist.lastSync ? new Date(selectedProva.startlist.lastSync).toLocaleString('pt-PT') : 'Nunca'}
+                    </div>
+                    <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>ÚLTIMA SYNC</div>
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+                  <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
+                    Colar lista manualmente (reserva, se a automática falhar)
+                  </label>
+                  <textarea
+                    value={startlistPaste}
+                    onChange={e => setStartlistPaste(e.target.value)}
+                    placeholder="Cole a startlist aqui..."
+                    style={{
+                      width: '100%',
+                      minHeight: 100,
+                      padding: 10,
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--on-ink)',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 12,
+                    }}
+                  />
+                  <button className="btn-primary" style={{ marginTop: 8 }} onClick={processarStartlist} disabled={savingStartlist}>
+                    {savingStartlist ? 'A processar…' : 'Processar'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Etapas */}
+              <div
+                className="mono"
+                style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', marginBottom: 12 }}
+              >
+                Etapas
+              </div>
+
+              {selectedProva.etapas_planeadas
+                .slice()
+                .sort((a, b) => Number(a.numero_etapa) - Number(b.numero_etapa))
+                .map(etapa => {
+                  const numero = Number(etapa.numero_etapa)
+                  const resultado = selectedProva.etapas_resultados.find(r => r.numero_etapa === numero)
+                  const badge = importBadge(resultado?.import_status ?? null)
+                  return (
+                    <div key={numero} className="card" style={{ marginBottom: 16, background: 'var(--surface-2)' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: 16,
+                          borderBottom: '1px solid var(--border)',
+                          paddingBottom: 12,
+                        }}
+                      >
+                        <div className="mono" style={{ fontSize: 16, fontWeight: 700 }}>Etapa {numero}</div>
+                        <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-dim)', alignItems: 'center' }}>
+                          <span className="mono">{etapa.data_etapa ?? '—'}</span>
+                          <span
+                            className="mono"
+                            style={{ background: badge.bg, color: badge.color, padding: '3px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}
+                          >
+                            {badge.label}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
+                        {etapa.distancia_km ?? '—'} km • +{etapa.elevacao_m ?? '—'} m • {etapa.perfil ?? '—'}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                        {(
+                          [
+                            ['Classificação Geral', !!resultado?.classificacao_geral_top20?.some(Boolean)],
+                            ['Sprint', !!resultado?.camisola_sprint],
+                            ['Montanha', !!resultado?.camisola_montanha],
+                            ['Juventude', !!resultado?.camisola_juventude],
+                          ] as const
+                        ).map(([label, presente]) => (
+                          <div key={label} className="card" style={{ padding: 12 }}>
+                            <div className="mono" style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{label}</div>
+                            <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  background: presente ? '#146633' : 'var(--text-dim)',
+                                  display: 'inline-block',
+                                }}
+                              />
+                              {presente ? 'Guardado' : 'Falta'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <button className="btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: '8px 12px' }} onClick={() => abrirResultados(numero)}>
+                        Editar Resultados
+                      </button>
+                    </div>
+                  )
+                })}
+              {selectedProva.etapas_planeadas.length === 0 && (
+                <div style={{ color: 'var(--text-dim)', padding: 20 }}>Esta prova ainda não tem etapas planeadas.</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal criar/editar prova */}
+      {showProvaModal && editingProva && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowProvaModal(false)}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: 640, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 28, position: 'relative' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="display-lg" style={{ marginBottom: 20 }}>{editingProva.id ? 'Editar' : 'Criar'} Prova</div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Nome</label>
+              <input
+                className="form-field"
+                style={{ width: '100%', padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                value={editingProva.nome}
+                onChange={e => setEditingProva({ ...editingProva, nome: e.target.value })}
+                placeholder="Ex: Tour de France 2026"
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Categoria</label>
+              <select
+                className="form-field"
+                style={{ width: '100%', padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                value={editingProva.categoria}
+                onChange={e => setEditingProva({ ...editingProva, categoria: e.target.value })}
+              >
+                <option value="">Escolhe…</option>
+                {CATEGORIAS.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Status</label>
+              <select
+                className="form-field"
+                style={{ width: '100%', padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                value={editingProva.status}
+                onChange={e => setEditingProva({ ...editingProva, status: e.target.value })}
+              >
+                {STATUSES.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>PCS Slug</label>
+              <input
+                className="form-field"
+                style={{ width: '100%', padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                value={editingProva.pcs_slug}
+                onChange={e => setEditingProva({ ...editingProva, pcs_slug: e.target.value })}
+                placeholder="Ex: tour-de-france"
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div className="mono" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8 }}>
+                Etapas Planeadas
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {editingProva.etapas.map((etapa, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 12,
+                      display: 'grid',
+                      gridTemplateColumns: '0.6fr 1fr 1fr 0.7fr 0.7fr 1fr 1fr 0.8fr auto',
+                      gap: 6,
+                    }}
+                  >
+                    <input className="stage-input-field" placeholder="Num" value={etapa.numero_etapa} onChange={e => atualizarEtapaForm(index, 'numero_etapa', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input type="date" placeholder="Data" value={etapa.data_etapa ?? ''} onChange={e => atualizarEtapaForm(index, 'data_etapa', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input placeholder="Perfil" value={etapa.perfil ?? ''} onChange={e => atualizarEtapaForm(index, 'perfil', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input placeholder="Dist (km)" value={etapa.distancia_km ?? ''} onChange={e => atualizarEtapaForm(index, 'distancia_km', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input placeholder="D+ (m)" value={etapa.elevacao_m ?? ''} onChange={e => atualizarEtapaForm(index, 'elevacao_m', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input placeholder="Partida" value={etapa.local_partida ?? ''} onChange={e => atualizarEtapaForm(index, 'local_partida', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input placeholder="Chegada" value={etapa.local_chegada ?? ''} onChange={e => atualizarEtapaForm(index, 'local_chegada', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <input type="time" placeholder="Início" value={etapa.hora_inicio ?? ''} onChange={e => atualizarEtapaForm(index, 'hora_inicio', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
+                    <button onClick={() => removerEtapaForm(index)} style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 18, cursor: 'pointer' }}>
+                      −
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div
+                onClick={adicionarEtapaForm}
+                style={{ background: 'var(--surface-2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center', cursor: 'pointer', marginTop: 8 }}
+              >
+                + Adicionar Etapa
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={guardarProva}>Guardar</button>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowProvaModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal resultados */}
+      {showResultsModal && editingEtapaNumero != null && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowResultsModal(false)}
+        >
+          <div className="card" style={{ maxWidth: 600, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div className="display-lg" style={{ marginBottom: 20 }}>Resultados Etapa {editingEtapaNumero}</div>
+
+            {(
+              [
+                ['classificacao', 'Classificação Geral'],
+                ['sprint', 'Sprint'],
+                ['montanha', 'Montanha'],
+                ['juventude', 'Juventude'],
+              ] as const
+            ).map(([campo, label]) => (
+              <div key={campo} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{label}</label>
+                <textarea
+                  style={{ width: '100%', minHeight: 80, padding: 10, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+                  placeholder={`Cole os resultados de ${label.toLowerCase()}...`}
+                  value={resultsForm[campo]}
+                  onChange={e => setResultsForm({ ...resultsForm, [campo]: e.target.value })}
+                />
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={guardarResultados} disabled={savingResults}>
+                {savingResults ? 'A guardar…' : 'Guardar'}
+              </button>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowResultsModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
