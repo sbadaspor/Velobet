@@ -16,7 +16,12 @@ import { fetchClassificacaoTexto, fetchStartlistTexto, buildStageUrl, buildStart
  */
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secretQuery = new URL(req.url).searchParams.get('secret')
+  const autorizado =
+    !process.env.CRON_SECRET ||
+    authHeader === `Bearer ${process.env.CRON_SECRET}` ||
+    secretQuery === process.env.CRON_SECRET
+  if (!autorizado) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
