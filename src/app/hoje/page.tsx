@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { RoutePoint } from '@/components/RouteMap'
-
-const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false })
+import ElevationProfile from '@/components/ElevationProfile'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const MESES = [
@@ -292,24 +290,22 @@ export default function HojePage() {
                 </div>
               </div>
             </div>
+
+            {proximaEtapa.rotaPontos && proximaEtapa.rotaPontos.length >= 2 && (
+              <>
+                <div className="divider" />
+                <ElevationProfile
+                  pontos={proximaEtapa.rotaPontos}
+                  distanciaKm={proximaEtapa.distancia ?? 0}
+                  height={90}
+                  dim
+                />
+              </>
+            )}
           </div>
         ) : (
           <div className="table-wrapper text-center py-10 px-5 mb-6">
             <div className="text-text-sub text-sm">Sem etapas agendadas</div>
-          </div>
-        )}
-
-        {proximaEtapa?.status === 'A decorrer' && proximaEtapa.rotaPontos && proximaEtapa.rotaPontos.length >= 2 && (
-          <div className="mb-6">
-            <RouteMap
-              route={{
-                distancia_km: proximaEtapa.distancia,
-                elevacao_m: proximaEtapa.elevacao,
-                perfil: proximaEtapa.perfil,
-                pontos: proximaEtapa.rotaPontos,
-              }}
-              size="large"
-            />
           </div>
         )}
 
