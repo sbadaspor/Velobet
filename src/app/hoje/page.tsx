@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import type { RoutePoint } from '@/components/RouteMap'
+
+const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false })
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const MESES = [
@@ -106,6 +110,7 @@ type EtapaRow = {
   local_partida: string | null
   local_chegada: string | null
   data_etapa: string
+  rota_pontos: RoutePoint[] | null
 }
 
 type ProximaEtapa = {
@@ -116,6 +121,7 @@ type ProximaEtapa = {
   elevacao: number | null
   status: 'Brevemente' | 'A decorrer'
   daysLeft: number
+  rotaPontos: RoutePoint[] | null
 }
 
 export default function HojePage() {
@@ -168,7 +174,7 @@ export default function HojePage() {
       if (provasList.length > 0) {
         const { data: etapasData } = await supabase
           .from('etapas_planeadas')
-          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa')
+          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, rota_pontos')
           .in('prova_id', provasList.map(p => p.id))
           .order('data_etapa', { ascending: true })
 
@@ -199,6 +205,7 @@ export default function HojePage() {
       elevacao: candidata.elevacao_m,
       status: isHoje || prova?.status === 'fechada' ? 'A decorrer' : 'Brevemente',
       daysLeft: diasAte(candidata.data_etapa),
+      rotaPontos: candidata.rota_pontos,
     }
   }, [etapas, provas])
 
@@ -289,6 +296,20 @@ export default function HojePage() {
         ) : (
           <div className="table-wrapper text-center py-10 px-5 mb-6">
             <div className="text-text-sub text-sm">Sem etapas agendadas</div>
+          </div>
+        )}
+
+        {proximaEtapa?.status === 'A decorrer' && proximaEtapa.rotaPontos && proximaEtapa.rotaPontos.length >= 2 && (
+          <div className="mb-6">
+            <RouteMap
+              route={{
+                distancia_km: proximaEtapa.distancia,
+                elevacao_m: proximaEtapa.elevacao,
+                perfil: proximaEtapa.perfil,
+                pontos: proximaEtapa.rotaPontos,
+              }}
+              size="large"
+            />
           </div>
         )}
 
