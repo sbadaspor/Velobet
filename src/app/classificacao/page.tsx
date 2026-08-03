@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { calcularPontos, compararDesempate, type CategoriaProvaTipo } from '@/lib/pontuacao'
+import { calcularPontos, compararDesempate, getConfigCategoria, type CategoriaProvaTipo } from '@/lib/pontuacao'
+import JerseyBadge from '@/components/JerseyBadge'
 
 // Paleta fixa para as linhas do gráfico de evolução — mesma ordem
 // sempre, registada no design system (Chart — Evolução).
@@ -484,6 +485,18 @@ export default function ClassificacaoPage() {
                           </tbody>
                         </table>
                       </div>
+
+                      {/* Camisolas de líder (Sprint, Montanha, Juventude) */}
+                      {getConfigCategoria(comp.prova.categoria).temCamisolas && (
+                        <>
+                          <div className="text-sm font-semibold text-text-dim mb-3 mt-8">Camisolas de Líder</div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <JerseyBadge tipo="sprint" rider={etapaAtual.camisola_sprint} provaNome={comp.prova.nome} />
+                            <JerseyBadge tipo="montanha" rider={etapaAtual.camisola_montanha} provaNome={comp.prova.nome} />
+                            <JerseyBadge tipo="juventude" rider={etapaAtual.camisola_juventude} provaNome={comp.prova.nome} />
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
