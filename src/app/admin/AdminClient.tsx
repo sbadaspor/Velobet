@@ -161,15 +161,19 @@ export default function AdminClient() {
     }
     const url = editingProva.id ? `/api/admin/provas/${editingProva.id}` : '/api/admin/provas'
     const method = editingProva.id ? 'PUT' : 'POST'
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    const json = await res.json()
-    if (!res.ok) {
-      alert('Erro a guardar: ' + json.error)
-      return
+    try {
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro a guardar: ' + json.error)
+        return
+      }
+      setShowProvaModal(false)
+      setEditingProva(null)
+      carregar()
+    } catch (e) {
+      alert('Erro a guardar: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
     }
-    setShowProvaModal(false)
-    setEditingProva(null)
-    carregar()
   }
 
   async function apagarProva(p: Prova) {
