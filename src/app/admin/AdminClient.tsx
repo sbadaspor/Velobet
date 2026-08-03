@@ -32,6 +32,8 @@ type Prova = {
   categoria: string
   status: string
   pcs_slug: string | null
+  data_inicio: string | null
+  data_fim: string | null
   startlist_sync_em: string | null
   startlist_sync_status: string | null
   etapas_planeadas: EtapaPlaneada[]
@@ -82,6 +84,8 @@ export default function AdminClient() {
     categoria: string
     status: string
     pcs_slug: string
+    data_inicio: string
+    data_fim: string
     etapas: EtapaPlaneada[]
   } | null>(null)
 
@@ -116,7 +120,7 @@ export default function AdminClient() {
   const selectedProva = provas.find(p => p.id === selectedProvaId) ?? null
 
   function abrirCriarProva() {
-    setEditingProva({ nome: '', categoria: '', status: 'aberta', pcs_slug: '', etapas: [emptyEtapa()] })
+    setEditingProva({ nome: '', categoria: '', status: 'aberta', pcs_slug: '', data_inicio: '', data_fim: '', etapas: [emptyEtapa()] })
     setShowProvaModal(true)
   }
 
@@ -127,6 +131,8 @@ export default function AdminClient() {
       categoria: p.categoria,
       status: p.status,
       pcs_slug: p.pcs_slug ?? '',
+      data_inicio: p.data_inicio ?? '',
+      data_fim: p.data_fim ?? '',
       etapas:
         p.etapas_planeadas.length > 0
           ? p.etapas_planeadas
@@ -140,11 +146,17 @@ export default function AdminClient() {
 
   async function guardarProva() {
     if (!editingProva) return
+    if (!editingProva.data_inicio || !editingProva.data_fim) {
+      alert('Data de início e data de fim são obrigatórias.')
+      return
+    }
     const payload = {
       nome: editingProva.nome,
       categoria: editingProva.categoria,
       status: editingProva.status,
       pcs_slug: editingProva.pcs_slug,
+      data_inicio: editingProva.data_inicio,
+      data_fim: editingProva.data_fim,
       etapas: editingProva.etapas,
     }
     const url = editingProva.id ? `/api/admin/provas/${editingProva.id}` : '/api/admin/provas'
@@ -571,6 +583,29 @@ export default function AdminClient() {
                 onChange={e => setEditingProva({ ...editingProva, pcs_slug: e.target.value })}
                 placeholder="Ex: tour-de-france"
               />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Data de Início</label>
+                <input
+                  type="date"
+                  className="form-field"
+                  style={{ width: '100%', padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                  value={editingProva.data_inicio}
+                  onChange={e => setEditingProva({ ...editingProva, data_inicio: e.target.value })}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Data de Fim</label>
+                <input
+                  type="date"
+                  className="form-field"
+                  style={{ width: '100%', padding: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                  value={editingProva.data_fim}
+                  onChange={e => setEditingProva({ ...editingProva, data_fim: e.target.value })}
+                />
+              </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
