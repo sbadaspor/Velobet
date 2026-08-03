@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import type { RoutePoint } from '@/components/RouteMap'
+
+const RouteMap = dynamic(() => import('@/components/RouteMap'), { ssr: false })
 
 // ── Ícones (mesmo estilo outline das outras páginas) ──
 const HomeIcon = () => (
@@ -69,6 +73,7 @@ type EtapaPlaneada = {
   elevacao_m: number | null
   local_partida: string | null
   local_chegada: string | null
+  rota_pontos: RoutePoint[] | null
 }
 
 type Competicao = {
@@ -312,6 +317,20 @@ export default function ProximasPage() {
                                       <div className="text-sm font-bold mt-0.5 truncate">{stage.perfil}</div>
                                     </div>
                                   )}
+                                </div>
+                              )}
+
+                              {stageExpanded && stage.rota_pontos && stage.rota_pontos.length >= 2 && (
+                                <div className="mt-3 pl-9">
+                                  <RouteMap
+                                    route={{
+                                      distancia_km: stage.distancia_km,
+                                      elevacao_m: stage.elevacao_m,
+                                      perfil: stage.perfil,
+                                      pontos: stage.rota_pontos,
+                                    }}
+                                    size="compact"
+                                  />
                                 </div>
                               )}
                             </div>
