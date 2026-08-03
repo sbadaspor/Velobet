@@ -13,10 +13,11 @@ export type RouteMapData = {
   pontos: RoutePoint[] | null
 }
 
-type SlopeBar = { slopeClass: number; height: number }
+type ProfileSegment = { x1: number; x2: number; y1: number; y2: number; slopeClass: number }
 
 const SLOPE_COLORS = ['#4ade80', '#0ea5e9', '#facc15', '#fb923c', '#dc2626']
 const SLOPE_LEGEND = ['0–2%', '2–4%', '4–6%', '6–8%', '8%+']
+const CHART_W = 400
 
 function slopeClassFor(pct: number) {
   if (pct < 2) return 0
@@ -26,33 +27,51 @@ function slopeClassFor(pct: number) {
   return 4
 }
 
-/** Divide os pontos da rota em N segmentos e calcula a inclinação média de
- * cada um, para colorir as barras do perfil de elevação (mesma lógica do
- * handoff do Claude Design). */
-function buildSlopeBars(pontos: RoutePoint[], distanciaKm: number, segmentCount: number, maxHeight: number) {
+/** Constrói a silhueta real da altimetria (um polígono preenchido por par de
+ * pontos consecutivos), colorido segundo a inclinação local — em vez de
+ * barras soltas, o topo de cada polígono segue a elevação real do ponto
+ * seguinte, dando uma curva contínua (tipo perfil de montanha). */
+function buildProfileSegments(pontos: RoutePoint[], distanciaKm: number, chartH: number) {
   const elevations = pontos.map(p => p.elevation ?? 0)
-  if (elevations.length < 2) return { bars: [] as SlopeBar[], maxSlope: 0 }
+  const n = elevations.length
+  if (n < 2) return { segments: [] as ProfileSegment[], maxSlope: 0 }
 
-  const segmentSize = Math.ceil(elevations.length / segmentCount)
-  const bars: SlopeBar[] = []
+  const minE = Math.min(...elevations)
+  const maxE = Math.max(...elevations)
+  const range = Math.max(1, maxE - minE)
+  const segDistKm = distanciaKm / (n - 1)
+
+  const segments: ProfileSegment[] = []
   let maxSlope = 0
 
-  for (let i = 0; i < segmentCount; i++) {
-    const startIdx = i * segmentSize
-    const endIdx = Math.min((i + 1) * segmentSize, elevations.length - 1)
-    if (startIdx >= elevations.length - 1) continue
+  for (let i = 0; i < n - 1; i++) {
+    const x1 = (i / (n - 1)) * CHART_W
+    const x2 = ((i + 1) / (n - 1)) * CHART_W
+    const y1 = chartH - ((elevations[i] - minE) / range) * chartH
+    const y2 = chartH - ((elevations[i + 1] - minE) / range) * chartH
 
-    const startElev = elevations[startIdx]
-    const endElev = elevations[endIdx]
-    const segmentDist = (distanciaKm * (endIdx - startIdx)) / elevations.length
-    const elevGain = Math.max(0, endElev - startElev)
-    const slopePercent = segmentDist > 0 ? (elevGain / (segmentDist * 1000)) * 100 : 0
+    const gain = Math.max(0, elevations[i + 1] - elevations[i])
+    const slopePercent = segDistKm > 0 ? (gain / (segDistKm * 1000)) * 100 : 0
     maxSlope = Math.max(maxSlope, slopePercent)
 
-    bars.push({ slopeClass: slopeClassFor(slopePercent), height: Math.max(4, (slopePercent / 12) * maxHeight) })
+    segments.push({ x1, x2, y1, y2, slopeClass: slopeClassFor(slopePercent) })
   }
 
-  return { bars, maxSlope }
+  return { segments, maxSlope }
+}
+
+function ElevationChart({ segments, height }: { segments: ProfileSegment[]; height: number }) {
+  return (
+    <svg viewBox={`0 0 ${CHART_W} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
+      {segments.map((s, i) => (
+        <polygon
+          key={i}
+          points={`${s.x1},${height} ${s.x1},${s.y1} ${s.x2},${s.y2} ${s.x2},${height}`}
+          fill={SLOPE_COLORS[s.slopeClass]}
+        />
+      ))}
+    </svg>
+  )
 }
 
 export default function RouteMap({ route, size }: { route: RouteMapData; size: 'compact' | 'large' }) {
@@ -117,19 +136,16 @@ export default function RouteMap({ route, size }: { route: RouteMapData; size: '
 
   const distancia = route.distancia_km ?? 0
   const isCompact = size === 'compact'
-  const { bars, maxSlope } = buildSlopeBars(pontos, distancia, 20, isCompact ? 60 : 100)
+  const chartHeight = isCompact ? 80 : 130
+  const { segments, maxSlope } = buildProfileSegments(pontos, distancia, chartHeight)
 
   return (
     <div className="card overflow-hidden p-0">
-      <div style={{ height: isCompact ? 180 : 240 }} ref={mapRef} />
+      <div style={{ height: isCompact ? 220 : 280 }} ref={mapRef} />
 
       {isCompact ? (
         <div className="flex flex-col gap-3 px-4 py-3 bg-surface-2 border-t border-border">
-          <div className="flex items-end gap-[1px]" style={{ height: 60 }}>
-            {bars.map((bar, i) => (
-              <div key={i} className="flex-1 rounded-[1px]" style={{ height: bar.height, background: SLOPE_COLORS[bar.slopeClass], minHeight: 2 }} />
-            ))}
-          </div>
+          <ElevationChart segments={segments} height={chartHeight} />
           <div className="flex gap-6">
             <div>
               <div className="eyebrow" style={{ fontSize: 9 }}>Distância</div>
@@ -164,11 +180,7 @@ export default function RouteMap({ route, size }: { route: RouteMapData; size: '
             </div>
           </div>
 
-          <div className="flex items-end gap-[1px]" style={{ height: 100 }}>
-            {bars.map((bar, i) => (
-              <div key={i} className="flex-1 rounded-[1px]" style={{ height: bar.height, background: SLOPE_COLORS[bar.slopeClass], minHeight: 2 }} />
-            ))}
-          </div>
+          <ElevationChart segments={segments} height={chartHeight} />
 
           <div className="flex gap-3 mono text-[10px] text-text-dim flex-wrap">
             {SLOPE_LEGEND.map((label, i) => (
