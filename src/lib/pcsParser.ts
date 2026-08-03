@@ -22,10 +22,17 @@ export type LinhaStartlist = {
 }
 
 /**
- * Processa uma tabela de classificação (GC, Points, KOM ou Youth) —
- * formato: posição, nome do ciclista, equipa, ... , tempo. Aceita
- * colunas separadas por tab (copiar de uma tabela HTML) ou por
- * múltiplos espaços.
+ * Processa uma tabela de classificação (GC, Points, KOM, Youth ou
+ * Stage) copiada do procyclingstats. Aceita dois formatos, porque o
+ * copiar-colar real do site espalha cada ciclista por DUAS linhas:
+ *
+ *   1	 Milan Jonathan
+ *   Lidl - Trek	8	10″	5:04:01
+ *
+ * (posição+nome numa linha, equipa+...+tempo na seguinte) — mas
+ * também aceita tudo numa única linha separada por tabs, para colagens
+ * de outras fontes. "," ou "″" sozinhos na coluna do tempo significam
+ * "igual ao ciclista anterior" — herda o tempo anterior.
  */
 export function parseClassificacao(texto: string): LinhaClassificacao[] {
   const linhas = texto
@@ -34,26 +41,50 @@ export function parseClassificacao(texto: string): LinhaClassificacao[] {
     .filter(Boolean)
 
   const resultado: LinhaClassificacao[] = []
+  let ultimoTempo = ''
+  let i = 0
 
-  for (const linha of linhas) {
-    if (/^rnk\b/i.test(linha)) continue // cabeçalho da tabela
+  while (i < linhas.length) {
+    const linha = linhas[i]
+    if (/^rnk\b/i.test(linha)) { i++; continue } // cabeçalho da tabela
 
-    let cols = linha.split('\t').map(c => c.trim()).filter(c => c !== '')
-    if (cols.length < 2) {
-      cols = linha.split(/\s{2,}/).map(c => c.trim()).filter(Boolean)
-    }
-    if (cols.length < 2) continue
-
-    const posMatch = cols[0].match(/^(\d+)/)
-    if (!posMatch) continue
-
+    const colsLinha = linha.split('\t').map(c => c.trim()).filter(c => c !== '')
+    const primeiraCol = colsLinha[0] ?? ''
+    const posMatch = primeiraCol.match(/^(\d+)/)
+    if (!posMatch) { i++; continue }
     const posicao = parseInt(posMatch[1], 10)
-    // remove bandeiras/emojis no início do nome
-    const nome = cols[1].replace(/^[^\p{L}]*/u, '').trim()
+
+    let nome = ''
+    let equipa = ''
+    let tempoBruto = ''
+
+    if (colsLinha.length >= 3) {
+      // Tudo numa única linha: posição, nome, [equipa,] ..., tempo
+      nome = colsLinha[1]
+      equipa = colsLinha.length > 2 ? colsLinha[2] : ''
+      tempoBruto = colsLinha[colsLinha.length - 1]
+      i += 1
+    } else {
+      // Nome nesta linha; equipa + tempo vêm na linha seguinte
+      nome = colsLinha[1] ?? primeiraCol.replace(/^\d+/, '')
+      const proxima = linhas[i + 1]
+      if (proxima && !/^\d+(\s|\t)/.test(proxima)) {
+        const colsProxima = proxima.split('\t').map(c => c.trim()).filter(c => c !== '')
+        if (colsProxima.length > 0) {
+          equipa = colsProxima[0]
+          tempoBruto = colsProxima[colsProxima.length - 1]
+        }
+        i += 2
+      } else {
+        i += 1
+      }
+    }
+
+    nome = nome.replace(/^[^\p{L}]*/u, '').trim()
     if (!nome) continue
 
-    const equipa = cols.length > 3 ? cols[2] : cols.length === 3 ? cols[2] : ''
-    const tempo = cols[cols.length - 1] ?? ''
+    const tempo = /^[,″]+$/.test(tempoBruto) ? ultimoTempo : tempoBruto
+    if (tempo) ultimoTempo = tempo
 
     resultado.push({ posicao, nome, equipa, tempo })
   }
