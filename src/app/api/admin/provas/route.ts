@@ -11,7 +11,7 @@ export async function GET() {
   const { data: provas, error } = await supabase
     .from('provas')
     .select(
-      `id, nome, categoria, status, pcs_slug, startlist_sync_em, startlist_sync_status,
+      `id, nome, categoria, status, pcs_slug, data_inicio, data_fim, startlist_sync_em, startlist_sync_status,
        etapas_planeadas ( id, numero_etapa, data_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, hora_inicio ),
        etapas_resultados ( id, numero_etapa, classificacao_geral_top20, camisola_sprint, camisola_montanha, camisola_juventude, import_status, import_erro, importado_em )`
     )
@@ -70,23 +70,28 @@ export async function POST(req: Request) {
   if (!admin) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 })
 
   const body = await req.json()
-  const { nome, categoria, status, pcs_slug, etapas } = body as {
+  const { nome, categoria, status, pcs_slug, data_inicio, data_fim, etapas } = body as {
     nome: string
     categoria: string
     status: string
     pcs_slug?: string
+    data_inicio: string
+    data_fim: string
     etapas?: EtapaInput[]
   }
 
   if (!nome || !categoria || !status) {
     return NextResponse.json({ error: 'Nome, categoria e status são obrigatórios' }, { status: 400 })
   }
+  if (!data_inicio || !data_fim) {
+    return NextResponse.json({ error: 'Data de início e data de fim são obrigatórias' }, { status: 400 })
+  }
 
   const supabase = createAdminClient()
 
   const { data: novaProva, error } = await supabase
     .from('provas')
-    .insert({ nome, categoria, status, pcs_slug: pcs_slug || null })
+    .insert({ nome, categoria, status, pcs_slug: pcs_slug || null, data_inicio, data_fim })
     .select('id')
     .single()
 
