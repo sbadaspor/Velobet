@@ -302,7 +302,7 @@ export default function ProximasPage() {
                               </div>
 
                               {stageExpanded && (
-                                <div className="flex gap-6 mt-2 pl-9">
+                                <div className="flex gap-6 mt-2">
                                   <div>
                                     <div className="eyebrow" style={{ fontSize: 9 }}>Distância</div>
                                     <div className="mono text-sm font-bold mt-0.5">{stage.distancia_km ?? '—'} km</div>
@@ -321,7 +321,7 @@ export default function ProximasPage() {
                               )}
 
                               {stageExpanded && stage.rota_pontos && stage.rota_pontos.length >= 2 && (
-                                <div className="mt-3 pl-9">
+                                <div className="mt-3">
                                   <RouteMap
                                     route={{
                                       distancia_km: stage.distancia_km,
