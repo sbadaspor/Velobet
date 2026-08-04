@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 type EtapaPlaneada = {
   id?: string
   numero_etapa: number | string
+  nome: string | null
   data_etapa: string | null
   perfil: string | null
   distancia_km: number | string | null
@@ -60,6 +61,7 @@ function importBadge(status: string | null) {
 
 const emptyEtapa = (): EtapaPlaneada => ({
   numero_etapa: '',
+  nome: '',
   data_etapa: '',
   perfil: '',
   distancia_km: '',
@@ -168,9 +170,14 @@ export default function AdminClient() {
         alert('Erro a guardar: ' + json.error)
         return
       }
+      const provaId = editingProva.id ?? json.id
       setShowProvaModal(false)
       setEditingProva(null)
-      carregar()
+      await carregar()
+      if (provaId) {
+        setSelectedProvaId(provaId)
+        setActiveTab('etapas')
+      }
     } catch (e) {
       alert('Erro a guardar: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
     }
@@ -471,7 +478,9 @@ export default function AdminClient() {
                           paddingBottom: 12,
                         }}
                       >
-                        <div className="mono" style={{ fontSize: 16, fontWeight: 700 }}>Etapa {numero}</div>
+                        <div className="mono" style={{ fontSize: 16, fontWeight: 700 }}>
+                          Etapa {numero}{etapa.nome ? ` — ${etapa.nome}` : ''}
+                        </div>
                         <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-dim)', alignItems: 'center' }}>
                           <span className="mono">{etapa.data_etapa ?? '—'}</span>
                           <span
@@ -533,7 +542,7 @@ export default function AdminClient() {
         >
           <div
             className="card"
-            style={{ maxWidth: 640, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 28, position: 'relative' }}
+            style={{ maxWidth: 780, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 28, position: 'relative' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="display-lg" style={{ marginBottom: 20 }}>{editingProva.id ? 'Editar' : 'Criar'} Prova</div>
@@ -616,33 +625,58 @@ export default function AdminClient() {
               <div className="mono" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8 }}>
                 Etapas Planeadas
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {editingProva.etapas.map((etapa, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: 12,
-                      display: 'grid',
-                      gridTemplateColumns: '0.6fr 1fr 1fr 0.7fr 0.7fr 1fr 1fr 0.8fr auto',
-                      gap: 6,
-                    }}
-                  >
-                    <input className="stage-input-field" placeholder="Num" value={etapa.numero_etapa} onChange={e => atualizarEtapaForm(index, 'numero_etapa', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input type="date" placeholder="Data" value={etapa.data_etapa ?? ''} onChange={e => atualizarEtapaForm(index, 'data_etapa', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input placeholder="Perfil" value={etapa.perfil ?? ''} onChange={e => atualizarEtapaForm(index, 'perfil', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input placeholder="Dist (km)" value={etapa.distancia_km ?? ''} onChange={e => atualizarEtapaForm(index, 'distancia_km', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input placeholder="D+ (m)" value={etapa.elevacao_m ?? ''} onChange={e => atualizarEtapaForm(index, 'elevacao_m', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input placeholder="Partida" value={etapa.local_partida ?? ''} onChange={e => atualizarEtapaForm(index, 'local_partida', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input placeholder="Chegada" value={etapa.local_chegada ?? ''} onChange={e => atualizarEtapaForm(index, 'local_chegada', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <input type="time" placeholder="Início" value={etapa.hora_inicio ?? ''} onChange={e => atualizarEtapaForm(index, 'hora_inicio', e.target.value)} style={{ padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }} />
-                    <button onClick={() => removerEtapaForm(index)} style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 18, cursor: 'pointer' }}>
-                      −
-                    </button>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {editingProva.etapas.map((etapa, index) => {
+                  const campo = (
+                    label: string,
+                    valor: string,
+                    onChange: (v: string) => void,
+                    type: string = 'text'
+                  ) => (
+                    <div style={{ minWidth: 0 }}>
+                      <label className="mono" style={{ display: 'block', fontSize: 10, color: 'var(--text-dim)', marginBottom: 3 }}>
+                        {label}
+                      </label>
+                      <input
+                        type={type}
+                        value={valor}
+                        onChange={e => onChange(e.target.value)}
+                        style={{ width: '100%', padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12, boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  )
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                          Etapa {index + 1}
+                        </span>
+                        <button onClick={() => removerEtapaForm(index)} style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                          Remover
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
+                        {campo('Num', String(etapa.numero_etapa), v => atualizarEtapaForm(index, 'numero_etapa', v))}
+                        {campo('Nome (ex: Chorzów - Zabrze)', etapa.nome ?? '', v => atualizarEtapaForm(index, 'nome', v))}
+                        {campo('Data', etapa.data_etapa ?? '', v => atualizarEtapaForm(index, 'data_etapa', v), 'date')}
+                        {campo('Perfil', etapa.perfil ?? '', v => atualizarEtapaForm(index, 'perfil', v))}
+                        {campo('Dist (km)', String(etapa.distancia_km ?? ''), v => atualizarEtapaForm(index, 'distancia_km', v))}
+                        {campo('D+ (m)', String(etapa.elevacao_m ?? ''), v => atualizarEtapaForm(index, 'elevacao_m', v))}
+                        {campo('Partida', etapa.local_partida ?? '', v => atualizarEtapaForm(index, 'local_partida', v))}
+                        {campo('Chegada', etapa.local_chegada ?? '', v => atualizarEtapaForm(index, 'local_chegada', v))}
+                        {campo('Início', etapa.hora_inicio ?? '', v => atualizarEtapaForm(index, 'hora_inicio', v), 'time')}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
               <div
                 onClick={adicionarEtapaForm}
