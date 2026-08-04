@@ -101,6 +101,7 @@ export default function AdminClient() {
 
   const [startlistPaste, setStartlistPaste] = useState('')
   const [savingStartlist, setSavingStartlist] = useState(false)
+  const [savingStartlistPdf, setSavingStartlistPdf] = useState(false)
 
   async function carregar() {
     setLoading(true)
@@ -236,6 +237,28 @@ export default function AdminClient() {
       carregar()
     } finally {
       setSavingStartlist(false)
+    }
+  }
+
+  async function processarStartlistPdf(ficheiro: File) {
+    if (!selectedProva) return
+    setSavingStartlistPdf(true)
+    try {
+      const formData = new FormData()
+      formData.append('provaId', selectedProva.id)
+      formData.append('arquivo', ficheiro)
+      const res = await fetch('/api/admin/startlist/pdf', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro: ' + json.error)
+        return
+      }
+      alert(`Startlist processada a partir do PDF: ${json.total} ciclistas (${json.dnf} DNF).`)
+      carregar()
+    } catch (e) {
+      alert('Erro a processar o PDF: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
+    } finally {
+      setSavingStartlistPdf(false)
     }
   }
 
@@ -442,9 +465,39 @@ export default function AdminClient() {
                   </div>
                 </div>
 
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 12 }}>
+                  <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
+                    Carregar PDF da startlist (download direto do procyclingstats)
+                  </label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    disabled={savingStartlistPdf}
+                    onChange={e => {
+                      const ficheiro = e.target.files?.[0]
+                      if (ficheiro) processarStartlistPdf(ficheiro)
+                      e.target.value = ''
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: 8,
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--on-ink)',
+                      fontSize: 12,
+                    }}
+                  />
+                  {savingStartlistPdf && (
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--on-ink-dim)', marginTop: 6 }}>
+                      A ler e processar o PDF…
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12 }}>
                   <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
-                    Colar lista manualmente (reserva, se a automática falhar)
+                    Colar lista manualmente (reserva, se o PDF falhar)
                   </label>
                   <textarea
                     value={startlistPaste}
