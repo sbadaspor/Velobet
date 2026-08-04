@@ -55,14 +55,14 @@ export async function GET() {
 }
 
 type EtapaInput = {
-  numero: number | string
-  data?: string
-  perfil?: string
-  distancia?: number | string
-  desnivel?: number | string
-  local_partida?: string
-  local_chegada?: string
-  hora_inicio?: string
+  numero_etapa: number | string
+  data_etapa?: string | null
+  perfil?: string | null
+  distancia_km?: number | string | null
+  elevacao_m?: number | string | null
+  local_partida?: string | null
+  local_chegada?: string | null
+  hora_inicio?: string | null
 }
 
 export async function POST(req: Request) {
@@ -99,14 +99,14 @@ export async function POST(req: Request) {
 
   if (etapas && etapas.length > 0) {
     const linhas = etapas
-      .filter(e => e.numero !== '' && e.numero != null)
+      .filter(e => e.numero_etapa !== '' && e.numero_etapa != null)
       .map(e => ({
         prova_id: novaProva.id,
-        numero_etapa: Number(e.numero),
-        data_etapa: e.data || null,
+        numero_etapa: Number(e.numero_etapa),
+        data_etapa: e.data_etapa || null,
         perfil: e.perfil || null,
-        distancia_km: e.distancia !== '' && e.distancia != null ? Number(e.distancia) : null,
-        elevacao_m: e.desnivel !== '' && e.desnivel != null ? Number(e.desnivel) : null,
+        distancia_km: e.distancia_km !== '' && e.distancia_km != null ? Number(e.distancia_km) : null,
+        elevacao_m: e.elevacao_m !== '' && e.elevacao_m != null ? Number(e.elevacao_m) : null,
         local_partida: e.local_partida || null,
         local_chegada: e.local_chegada || null,
         hora_inicio: e.hora_inicio || null,
