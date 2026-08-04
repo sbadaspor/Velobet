@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 type EtapaInput = {
   numero_etapa: number | string
+  nome?: string | null
   data_etapa?: string | null
   perfil?: string | null
   distancia_km?: number | string | null
@@ -53,6 +54,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       const numero = Number(e.numero_etapa)
 
       const camposEtapa: Record<string, unknown> = {}
+      if (e.nome !== undefined) camposEtapa.nome = e.nome || null
       if (e.data_etapa) camposEtapa.data_etapa = e.data_etapa
       if (e.perfil) camposEtapa.perfil = e.perfil
       if (e.distancia_km !== '' && e.distancia_km != null) camposEtapa.distancia_km = Number(e.distancia_km)
