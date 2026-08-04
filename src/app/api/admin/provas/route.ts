@@ -12,7 +12,7 @@ export async function GET() {
     .from('provas')
     .select(
       `id, nome, categoria, status, pcs_slug, data_inicio, data_fim, startlist_sync_em, startlist_sync_status,
-       etapas_planeadas ( id, numero_etapa, data_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, hora_inicio ),
+       etapas_planeadas ( id, numero_etapa, nome, data_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, hora_inicio ),
        etapas_resultados ( id, numero_etapa, classificacao_geral_top20, camisola_sprint, camisola_montanha, camisola_juventude, import_status, import_erro, importado_em )`
     )
     .order('nome')
@@ -56,6 +56,7 @@ export async function GET() {
 
 type EtapaInput = {
   numero_etapa: number | string
+  nome?: string | null
   data_etapa?: string | null
   perfil?: string | null
   distancia_km?: number | string | null
@@ -103,6 +104,7 @@ export async function POST(req: Request) {
       .map(e => ({
         prova_id: novaProva.id,
         numero_etapa: Number(e.numero_etapa),
+        nome: e.nome || null,
         data_etapa: e.data_etapa || null,
         perfil: e.perfil || null,
         distancia_km: e.distancia_km !== '' && e.distancia_km != null ? Number(e.distancia_km) : null,
