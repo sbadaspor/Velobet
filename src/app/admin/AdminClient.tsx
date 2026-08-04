@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 
 type EtapaPlaneada = {
   id?: string
@@ -348,67 +349,80 @@ export default function AdminClient() {
 
   if (loading) return <div style={{ padding: 40 }}>A carregar…</div>
 
-  return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'Archivo, sans-serif', color: 'var(--text)' }}>
-      {erro && <div style={{ color: 'var(--red)', marginBottom: 16 }}>{erro}</div>}
+  const navItemStyle = (ativo: boolean): CSSProperties => ({
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    padding: '12px 16px',
+    fontSize: 14,
+    fontWeight: 600,
+    color: ativo ? 'var(--ink)' : 'var(--on-ink-dim)',
+    background: ativo ? 'var(--gold)' : 'transparent',
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    cursor: 'pointer',
+    marginBottom: 4,
+  })
 
-      {/* Barra de estado */}
-      <div className="card" style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div className="mono" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)' }}>
-            Última importação automática
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 4 }}>
-            {ultimaImportacao ? (
-              ultimaImportacao.sucesso ? (
-                <span style={{ color: '#146633' }}>
-                  ✓ Sucesso — <span className="mono">{new Date(ultimaImportacao.executado_em).toLocaleString('pt-PT')}</span>
-                </span>
-              ) : (
-                <span style={{ color: 'var(--red)' }}>
-                  ✗ Falha — {ultimaImportacao.detalhes} (<span className="mono">{new Date(ultimaImportacao.executado_em).toLocaleString('pt-PT')}</span>)
-                </span>
-              )
-            ) : (
-              <span style={{ color: 'var(--text-dim)' }}>Ainda não correu nenhuma importação automática.</span>
-            )}
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', fontFamily: 'Archivo, sans-serif', color: 'var(--text)' }}>
+      {/* Sidebar */}
+      <aside
+        style={{
+          width: 220,
+          flexShrink: 0,
+          background: 'var(--ink)',
+          color: 'var(--on-ink)',
+          padding: '24px 12px',
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          overflowY: 'auto',
+        }}
+      >
+        <div className="display-lg" style={{ fontSize: 18, padding: '0 12px', marginBottom: 24, color: 'var(--on-ink)' }}>
+          VeloApostas
+          <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', fontWeight: 600, textTransform: 'uppercase', marginTop: 2 }}>
+            Admin
           </div>
         </div>
-      </div>
+        <nav>
+          <button onClick={() => setActiveTab('provas')} style={navItemStyle(activeTab === 'provas')}>
+            Provas
+          </button>
+          <button onClick={() => setActiveTab('etapas')} style={navItemStyle(activeTab === 'etapas')}>
+            Etapas
+          </button>
+        </nav>
+      </aside>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border)' }}>
-        <button
-          onClick={() => setActiveTab('provas')}
-          style={{
-            padding: '12px 16px',
-            fontSize: 14,
-            fontWeight: 600,
-            color: activeTab === 'provas' ? 'var(--text)' : 'var(--text-dim)',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'provas' ? '2px solid var(--gold)' : '2px solid transparent',
-            cursor: 'pointer',
-          }}
-        >
-          Provas
-        </button>
-        <button
-          onClick={() => setActiveTab('etapas')}
-          style={{
-            padding: '12px 16px',
-            fontSize: 14,
-            fontWeight: 600,
-            color: activeTab === 'etapas' ? 'var(--text)' : 'var(--text-dim)',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'etapas' ? '2px solid var(--gold)' : '2px solid transparent',
-            cursor: 'pointer',
-          }}
-        >
-          Etapas
-        </button>
-      </div>
+      {/* Conteúdo principal */}
+      <main style={{ flex: 1, minWidth: 0, padding: 24 }}>
+        {erro && <div style={{ color: 'var(--red)', marginBottom: 16 }}>{erro}</div>}
+
+        {/* Barra de estado */}
+        <div className="card" style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div className="mono" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)' }}>
+              Última importação automática
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 500, marginTop: 4 }}>
+              {ultimaImportacao ? (
+                ultimaImportacao.sucesso ? (
+                  <span style={{ color: '#146633' }}>
+                    ✓ Sucesso — <span className="mono">{new Date(ultimaImportacao.executado_em).toLocaleString('pt-PT')}</span>
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--red)' }}>
+                    ✗ Falha — {ultimaImportacao.detalhes} (<span className="mono">{new Date(ultimaImportacao.executado_em).toLocaleString('pt-PT')}</span>)
+                  </span>
+                )
+              ) : (
+                <span style={{ color: 'var(--text-dim)' }}>Ainda não correu nenhuma importação automática.</span>
+              )}
+            </div>
+          </div>
+        </div>
 
       {/* Provas tab */}
       {activeTab === 'provas' && (
@@ -649,6 +663,7 @@ export default function AdminClient() {
           )}
         </div>
       )}
+      </main>
 
       {/* Modal criar/editar prova */}
       {showProvaModal && editingProva && (
