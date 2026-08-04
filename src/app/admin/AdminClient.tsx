@@ -73,6 +73,17 @@ function importBadge(status: string | null) {
   return { label: 'Pendente', color: 'var(--text-dim)', bg: 'var(--surface-3)' }
 }
 
+/** Verdadeiro se o texto estiver vazio (nada para validar) ou for um JSON válido de pontos de rota. */
+function rotaPontosTextoValido(texto: string | undefined): boolean {
+  if (!texto || !texto.trim()) return true
+  try {
+    const parsed = JSON.parse(texto)
+    return Array.isArray(parsed) && parsed.every(p => typeof p.lat === 'number' && typeof p.lng === 'number')
+  } catch {
+    return false
+  }
+}
+
 const emptyEtapa = (): EtapaPlaneada => ({
   numero_etapa: '',
   nome: '',
@@ -115,9 +126,14 @@ export default function AdminClient() {
   const [savingStartlist, setSavingStartlist] = useState(false)
   const [savingStartlistPdf, setSavingStartlistPdf] = useState(false)
   const [apagandoStartlist, setApagandoStartlist] = useState(false)
+  const [startlistAberta, setStartlistAberta] = useState(true)
 
   const [etapasAbertas, setEtapasAbertas] = useState<Set<number>>(new Set())
   const [rankingModal, setRankingModal] = useState<{ titulo: string; linhas: LinhaClassificacao[] } | null>(null)
+
+  const [showEtapaModal, setShowEtapaModal] = useState(false)
+  const [editingEtapa, setEditingEtapa] = useState<EtapaPlaneada | null>(null)
+  const [savingEtapa, setSavingEtapa] = useState(false)
 
   function alternarEtapaAberta(numero: number) {
     setEtapasAbertas(anterior => {
@@ -187,17 +203,9 @@ export default function AdminClient() {
       return
     }
     for (let i = 0; i < editingProva.etapas.length; i++) {
-      const texto = editingProva.etapas[i].rota_pontos_texto
-      if (texto && texto.trim()) {
-        try {
-          const parsed = JSON.parse(texto)
-          if (!Array.isArray(parsed) || parsed.some(p => typeof p.lat !== 'number' || typeof p.lng !== 'number')) {
-            throw new Error('formato inválido')
-          }
-        } catch {
-          alert(`Etapa ${i + 1}: os "Pontos da Rota" não são um JSON válido. Deve ser uma lista como [{"lat":41.9,"lng":12.5}, ...].`)
-          return
-        }
+      if (!rotaPontosTextoValido(editingProva.etapas[i].rota_pontos_texto)) {
+        alert(`Etapa ${i + 1}: os "Pontos da Rota" não são um JSON válido. Deve ser uma lista como [{"lat":41.9,"lng":12.5}, ...].`)
+        return
       }
     }
     const payload = {
@@ -246,6 +254,7 @@ export default function AdminClient() {
     setSelectedProvaId(p.id)
     setActiveTab('etapas')
     setStartlistPaste('')
+    setStartlistAberta(p.startlist.count === 0)
   }
 
   async function processarStartlist() {
@@ -373,6 +382,44 @@ export default function AdminClient() {
       return
     }
     setEditingProva({ ...editingProva, etapas: editingProva.etapas.filter((_, i) => i !== index) })
+  }
+
+  function abrirEditarEtapa(etapa: EtapaPlaneada) {
+    setEditingEtapa({ ...etapa, rota_pontos_texto: '' })
+    setShowEtapaModal(true)
+  }
+
+  function atualizarEditingEtapa(campo: keyof EtapaPlaneada, valor: string) {
+    if (!editingEtapa) return
+    setEditingEtapa({ ...editingEtapa, [campo]: valor })
+  }
+
+  async function guardarEtapa() {
+    if (!editingEtapa || !selectedProva) return
+    if (!rotaPontosTextoValido(editingEtapa.rota_pontos_texto)) {
+      alert('Os "Pontos da Rota" não são um JSON válido. Deve ser uma lista como [{"lat":41.9,"lng":12.5}, ...].')
+      return
+    }
+    setSavingEtapa(true)
+    try {
+      const res = await fetch(`/api/admin/provas/${selectedProva.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ etapas: [editingEtapa] }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro a guardar: ' + json.error)
+        return
+      }
+      setShowEtapaModal(false)
+      setEditingEtapa(null)
+      carregar()
+    } catch (e) {
+      alert('Erro a guardar: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
+    } finally {
+      setSavingEtapa(false)
+    }
   }
 
   if (loading) return <div style={{ padding: 40 }}>A carregar…</div>
@@ -517,11 +564,28 @@ export default function AdminClient() {
 
               {/* Startlist */}
               <div style={{ background: 'var(--ink)', color: 'var(--on-ink)', borderRadius: 'var(--radius-lg)', padding: 20, marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <div style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: 18 }}>Startlist</div>
+                <div
+                  onClick={() => setStartlistAberta(a => !a)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: startlistAberta ? 16 : 0, cursor: 'pointer' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--on-ink-dim)', transform: startlistAberta ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>
+                      ▶
+                    </span>
+                    <div style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: 18 }}>Startlist</div>
+                    {!startlistAberta && (
+                      <div className="mono" style={{ fontSize: 12, color: 'var(--on-ink-dim)' }}>
+                        {selectedProva.startlist.count} ciclistas · última sync{' '}
+                        {selectedProva.startlist.lastSync ? new Date(selectedProva.startlist.lastSync).toLocaleString('pt-PT') : 'nunca'}
+                      </div>
+                    )}
+                  </div>
                   {selectedProva.startlist.count > 0 && (
                     <button
-                      onClick={apagarStartlist}
+                      onClick={e => {
+                        e.stopPropagation()
+                        apagarStartlist()
+                      }}
                       disabled={apagandoStartlist}
                       style={{ background: 'none', border: '1px solid rgba(255,255,255,0.25)', color: 'var(--on-ink-dim)', fontSize: 11, fontWeight: 600, padding: '6px 10px', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
                     >
@@ -529,77 +593,78 @@ export default function AdminClient() {
                     </button>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
-                    <div className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{selectedProva.startlist.count}</div>
-                    <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>CICLISTAS</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
-                    <div className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{selectedProva.startlist.dnf}</div>
-                    <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>DNF</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
-                    <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
-                      {selectedProva.startlist.lastSync ? new Date(selectedProva.startlist.lastSync).toLocaleString('pt-PT') : 'Nunca'}
-                    </div>
-                    <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>ÚLTIMA SYNC</div>
-                  </div>
-                </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 12 }}>
-                  <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
-                    Carregar PDF da startlist (download direto do procyclingstats)
-                  </label>
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    disabled={savingStartlistPdf}
-                    onChange={e => {
-                      const ficheiro = e.target.files?.[0]
-                      if (ficheiro) processarStartlistPdf(ficheiro)
-                      e.target.value = ''
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: 8,
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--on-ink)',
-                      fontSize: 12,
-                    }}
-                  />
-                  {savingStartlistPdf && (
-                    <div className="mono" style={{ fontSize: 11, color: 'var(--on-ink-dim)', marginTop: 6 }}>
-                      A ler e processar o PDF…
+                {startlistAberta && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 20 }}>
+                      <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
+                        <div className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{selectedProva.startlist.count}</div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>CICLISTAS</div>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
+                        <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
+                          {selectedProva.startlist.lastSync ? new Date(selectedProva.startlist.lastSync).toLocaleString('pt-PT') : 'Nunca'}
+                        </div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', marginTop: 6 }}>ÚLTIMA SYNC</div>
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12 }}>
-                  <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
-                    Colar lista manualmente (reserva, se o PDF falhar)
-                  </label>
-                  <textarea
-                    value={startlistPaste}
-                    onChange={e => setStartlistPaste(e.target.value)}
-                    placeholder="Cole a startlist aqui..."
-                    style={{
-                      width: '100%',
-                      minHeight: 100,
-                      padding: 10,
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--on-ink)',
-                      fontFamily: 'JetBrains Mono, monospace',
-                      fontSize: 12,
-                    }}
-                  />
-                  <button className="btn-primary" style={{ marginTop: 8 }} onClick={processarStartlist} disabled={savingStartlist}>
-                    {savingStartlist ? 'A processar…' : 'Processar'}
-                  </button>
-                </div>
+                    <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, marginBottom: 12 }}>
+                      <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
+                        Carregar PDF da startlist (download direto do procyclingstats)
+                      </label>
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        disabled={savingStartlistPdf}
+                        onChange={e => {
+                          const ficheiro = e.target.files?.[0]
+                          if (ficheiro) processarStartlistPdf(ficheiro)
+                          e.target.value = ''
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: 8,
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: 'var(--radius-md)',
+                          color: 'var(--on-ink)',
+                          fontSize: 12,
+                        }}
+                      />
+                      {savingStartlistPdf && (
+                        <div className="mono" style={{ fontSize: 11, color: 'var(--on-ink-dim)', marginTop: 6 }}>
+                          A ler e processar o PDF…
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+                      <label className="mono" style={{ fontSize: 10, color: 'var(--on-ink-dim)', display: 'block', marginBottom: 6 }}>
+                        Colar lista manualmente (reserva, se o PDF falhar)
+                      </label>
+                      <textarea
+                        value={startlistPaste}
+                        onChange={e => setStartlistPaste(e.target.value)}
+                        placeholder="Cole a startlist aqui..."
+                        style={{
+                          width: '100%',
+                          minHeight: 100,
+                          padding: 10,
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: 'var(--radius-md)',
+                          color: 'var(--on-ink)',
+                          fontFamily: 'JetBrains Mono, monospace',
+                          fontSize: 12,
+                        }}
+                      />
+                      <button className="btn-primary" style={{ marginTop: 8 }} onClick={processarStartlist} disabled={savingStartlist}>
+                        {savingStartlist ? 'A processar…' : 'Processar'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Etapas */}
@@ -696,9 +761,14 @@ export default function AdminClient() {
                               )
                             })}
                           </div>
-                          <button className="btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: '8px 12px' }} onClick={() => abrirResultados(numero)}>
-                            Editar Resultados
-                          </button>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={() => abrirEditarEtapa(etapa)}>
+                              Editar Dados
+                            </button>
+                            <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={() => abrirResultados(numero)}>
+                              Editar Resultados
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -918,6 +988,73 @@ export default function AdminClient() {
                 {savingResults ? 'A guardar…' : 'Guardar'}
               </button>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowResultsModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar dados da etapa */}
+      {showEtapaModal && editingEtapa && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowEtapaModal(false)}
+        >
+          <div className="card" style={{ maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div className="display-lg" style={{ marginBottom: 20 }}>Editar Dados — Etapa {editingEtapa.numero_etapa}</div>
+
+            {(() => {
+              const campo = (
+                label: string,
+                valor: string,
+                onChange: (v: string) => void,
+                type: string = 'text'
+              ) => (
+                <div style={{ minWidth: 0 }}>
+                  <label className="mono" style={{ display: 'block', fontSize: 10, color: 'var(--text-dim)', marginBottom: 3 }}>
+                    {label}
+                  </label>
+                  <input
+                    type={type}
+                    value={valor}
+                    onChange={e => onChange(e.target.value)}
+                    style={{ width: '100%', padding: 8, border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }}
+                  />
+                </div>
+              )
+              return (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 12 }}>
+                    {campo('Num', String(editingEtapa.numero_etapa), v => atualizarEditingEtapa('numero_etapa', v))}
+                    {campo('Nome (ex: Chorzów - Zabrze)', editingEtapa.nome ?? '', v => atualizarEditingEtapa('nome', v))}
+                    {campo('Data', editingEtapa.data_etapa ?? '', v => atualizarEditingEtapa('data_etapa', v), 'date')}
+                    {campo('Perfil', editingEtapa.perfil ?? '', v => atualizarEditingEtapa('perfil', v))}
+                    {campo('Dist (km)', String(editingEtapa.distancia_km ?? ''), v => atualizarEditingEtapa('distancia_km', v))}
+                    {campo('D+ (m)', String(editingEtapa.elevacao_m ?? ''), v => atualizarEditingEtapa('elevacao_m', v))}
+                    {campo('Partida', editingEtapa.local_partida ?? '', v => atualizarEditingEtapa('local_partida', v))}
+                    {campo('Chegada', editingEtapa.local_chegada ?? '', v => atualizarEditingEtapa('local_chegada', v))}
+                    {campo('Início', editingEtapa.hora_inicio ?? '', v => atualizarEditingEtapa('hora_inicio', v), 'time')}
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <label className="mono" style={{ display: 'block', fontSize: 10, color: 'var(--text-dim)', marginBottom: 3 }}>
+                      Pontos da Rota (JSON — cola aqui para adicionar/substituir o mapa; deixa em branco para não alterar)
+                      {editingEtapa.tem_rota_pontos ? ' — já tem rota guardada' : ''}
+                    </label>
+                    <textarea
+                      value={editingEtapa.rota_pontos_texto ?? ''}
+                      onChange={e => atualizarEditingEtapa('rota_pontos_texto', e.target.value)}
+                      placeholder='Ex: [{"lat":41.9,"lng":12.5,"elevation":120}, ...]'
+                      style={{ width: '100%', minHeight: 60, padding: 8, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </>
+              )
+            })()}
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={guardarEtapa} disabled={savingEtapa}>
+                {savingEtapa ? 'A guardar…' : 'Guardar'}
+              </button>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowEtapaModal(false)}>Cancelar</button>
             </div>
           </div>
         </div>
