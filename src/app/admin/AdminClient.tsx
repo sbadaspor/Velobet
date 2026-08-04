@@ -13,6 +13,8 @@ type EtapaPlaneada = {
   local_partida: string | null
   local_chegada: string | null
   hora_inicio: string | null
+  tem_rota_pontos?: boolean
+  rota_pontos_texto?: string
 }
 
 type EtapaResultado = {
@@ -69,6 +71,7 @@ const emptyEtapa = (): EtapaPlaneada => ({
   local_partida: '',
   local_chegada: '',
   hora_inicio: '',
+  rota_pontos_texto: '',
 })
 
 export default function AdminClient() {
@@ -140,7 +143,7 @@ export default function AdminClient() {
           ? p.etapas_planeadas
               .slice()
               .sort((a, b) => Number(a.numero_etapa) - Number(b.numero_etapa))
-              .map(e => ({ ...e }))
+              .map(e => ({ ...e, rota_pontos_texto: '' }))
           : [emptyEtapa()],
     })
     setShowProvaModal(true)
@@ -151,6 +154,20 @@ export default function AdminClient() {
     if (!editingProva.data_inicio || !editingProva.data_fim) {
       alert('Data de início e data de fim são obrigatórias.')
       return
+    }
+    for (let i = 0; i < editingProva.etapas.length; i++) {
+      const texto = editingProva.etapas[i].rota_pontos_texto
+      if (texto && texto.trim()) {
+        try {
+          const parsed = JSON.parse(texto)
+          if (!Array.isArray(parsed) || parsed.some(p => typeof p.lat !== 'number' || typeof p.lng !== 'number')) {
+            throw new Error('formato inválido')
+          }
+        } catch {
+          alert(`Etapa ${i + 1}: os "Pontos da Rota" não são um JSON válido. Deve ser uma lista como [{"lat":41.9,"lng":12.5}, ...].`)
+          return
+        }
+      }
     }
     const payload = {
       nome: editingProva.nome,
@@ -491,8 +508,15 @@ export default function AdminClient() {
                           </span>
                         </div>
                       </div>
-                      <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-                        {etapa.distancia_km ?? '—'} km • +{etapa.elevacao_m ?? '—'} m • {etapa.perfil ?? '—'}
+                      <div style={{ marginBottom: 12 }}>
+                        <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                          {etapa.distancia_km ?? '—'} km • +{etapa.elevacao_m ?? '—'} m • {etapa.perfil ?? '—'}
+                        </div>
+                        {(etapa.local_partida || etapa.local_chegada) && (
+                          <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                            {etapa.local_partida ?? '—'} → {etapa.local_chegada ?? '—'}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
                         {(
@@ -673,6 +697,18 @@ export default function AdminClient() {
                         {campo('Partida', etapa.local_partida ?? '', v => atualizarEtapaForm(index, 'local_partida', v))}
                         {campo('Chegada', etapa.local_chegada ?? '', v => atualizarEtapaForm(index, 'local_chegada', v))}
                         {campo('Início', etapa.hora_inicio ?? '', v => atualizarEtapaForm(index, 'hora_inicio', v), 'time')}
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        <label className="mono" style={{ display: 'block', fontSize: 10, color: 'var(--text-dim)', marginBottom: 3 }}>
+                          Pontos da Rota (JSON — cola aqui para adicionar/substituir o mapa; deixa em branco para não alterar)
+                          {etapa.tem_rota_pontos ? ' — já tem rota guardada' : ''}
+                        </label>
+                        <textarea
+                          value={etapa.rota_pontos_texto ?? ''}
+                          onChange={e => atualizarEtapaForm(index, 'rota_pontos_texto', e.target.value)}
+                          placeholder='Ex: [{"lat":41.9,"lng":12.5,"elevation":120}, ...]'
+                          style={{ width: '100%', minHeight: 50, padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', boxSizing: 'border-box' }}
+                        />
                       </div>
                     </div>
                   )
