@@ -12,6 +12,19 @@ type EtapaInput = {
   local_partida?: string | null
   local_chegada?: string | null
   hora_inicio?: string | null
+  rota_pontos_texto?: string | null
+}
+
+/** Faz parse do JSON de pontos da rota colado no admin. Devolve `undefined`
+ * se o texto estiver vazio (não mexer no valor já guardado), ou lança erro
+ * se o JSON for inválido. */
+function parseRotaPontos(texto: string | null | undefined): unknown[] | undefined {
+  if (!texto || !texto.trim()) return undefined
+  const parsed = JSON.parse(texto)
+  if (!Array.isArray(parsed) || parsed.some((p: unknown) => typeof (p as { lat?: unknown })?.lat !== 'number' || typeof (p as { lng?: unknown })?.lng !== 'number')) {
+    throw new Error('formato inválido')
+  }
+  return parsed
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +66,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (e.numero_etapa === '' || e.numero_etapa == null) continue
       const numero = Number(e.numero_etapa)
 
+      let rotaPontos: unknown[] | undefined
+      try {
+        rotaPontos = parseRotaPontos(e.rota_pontos_texto)
+      } catch {
+        return NextResponse.json({ error: `Etapa ${numero}: pontos da rota (JSON) inválidos.` }, { status: 400 })
+      }
+
       const camposEtapa: Record<string, unknown> = {}
       if (e.nome !== undefined) camposEtapa.nome = e.nome || null
       if (e.data_etapa) camposEtapa.data_etapa = e.data_etapa
@@ -62,6 +82,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (e.local_partida) camposEtapa.local_partida = e.local_partida
       if (e.local_chegada) camposEtapa.local_chegada = e.local_chegada
       if (e.hora_inicio) camposEtapa.hora_inicio = e.hora_inicio
+      if (rotaPontos !== undefined) camposEtapa.rota_pontos = rotaPontos
 
       const { data: existente } = await supabase
         .from('etapas_planeadas')
