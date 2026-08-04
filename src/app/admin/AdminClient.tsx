@@ -102,6 +102,7 @@ export default function AdminClient() {
   const [startlistPaste, setStartlistPaste] = useState('')
   const [savingStartlist, setSavingStartlist] = useState(false)
   const [savingStartlistPdf, setSavingStartlistPdf] = useState(false)
+  const [apagandoStartlist, setApagandoStartlist] = useState(false)
 
   async function carregar() {
     setLoading(true)
@@ -259,6 +260,33 @@ export default function AdminClient() {
       alert('Erro a processar o PDF: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
     } finally {
       setSavingStartlistPdf(false)
+    }
+  }
+
+  async function apagarStartlist() {
+    if (!selectedProva || selectedProva.startlist.count === 0) return
+    if (
+      !confirm(
+        `Apagar os ${selectedProva.startlist.count} ciclistas da startlist de "${selectedProva.nome}"? Isto não tem volta a dar.`
+      )
+    ) {
+      return
+    }
+    setApagandoStartlist(true)
+    try {
+      const res = await fetch('/api/admin/startlist', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provaId: selectedProva.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro a apagar: ' + json.error)
+        return
+      }
+      carregar()
+    } finally {
+      setApagandoStartlist(false)
     }
   }
 
@@ -447,7 +475,18 @@ export default function AdminClient() {
 
               {/* Startlist */}
               <div style={{ background: 'var(--ink)', color: 'var(--on-ink)', borderRadius: 'var(--radius-lg)', padding: 20, marginBottom: 24 }}>
-                <div style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: 18, marginBottom: 16 }}>Startlist</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: 18 }}>Startlist</div>
+                  {selectedProva.startlist.count > 0 && (
+                    <button
+                      onClick={apagarStartlist}
+                      disabled={apagandoStartlist}
+                      style={{ background: 'none', border: '1px solid rgba(255,255,255,0.25)', color: 'var(--on-ink-dim)', fontSize: 11, fontWeight: 600, padding: '6px 10px', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                    >
+                      {apagandoStartlist ? 'A apagar…' : 'Apagar Startlist'}
+                    </button>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
                   <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-md)', padding: 12, textAlign: 'center' }}>
                     <div className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{selectedProva.startlist.count}</div>
