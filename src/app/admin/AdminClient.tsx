@@ -18,13 +18,24 @@ type EtapaPlaneada = {
   rota_pontos_texto?: string
 }
 
+type LinhaClassificacao = {
+  posicao: number
+  nome: string
+  equipa: string
+  tempo: string
+}
+
 type EtapaResultado = {
   id: string
   numero_etapa: number
   classificacao_geral_top20: string[] | null
+  classificacao_geral_completa: LinhaClassificacao[] | null
   camisola_sprint: string | null
   camisola_montanha: string | null
   camisola_juventude: string | null
+  sprint_completo: LinhaClassificacao[] | null
+  montanha_completo: LinhaClassificacao[] | null
+  juventude_completo: LinhaClassificacao[] | null
   import_status: 'pendente' | 'sucesso' | 'falha' | null
   import_erro: string | null
   importado_em: string | null
@@ -104,6 +115,23 @@ export default function AdminClient() {
   const [savingStartlist, setSavingStartlist] = useState(false)
   const [savingStartlistPdf, setSavingStartlistPdf] = useState(false)
   const [apagandoStartlist, setApagandoStartlist] = useState(false)
+
+  const [etapasAbertas, setEtapasAbertas] = useState<Set<number>>(new Set())
+  const [rankingModal, setRankingModal] = useState<{ titulo: string; linhas: LinhaClassificacao[] } | null>(null)
+
+  function alternarEtapaAberta(numero: number) {
+    setEtapasAbertas(anterior => {
+      const novo = new Set(anterior)
+      if (novo.has(numero)) novo.delete(numero)
+      else novo.add(numero)
+      return novo
+    })
+  }
+
+  function abrirRanking(titulo: string, linhas: LinhaClassificacao[] | null) {
+    if (!linhas || linhas.length === 0) return
+    setRankingModal({ titulo, linhas: [...linhas].sort((a, b) => a.posicao - b.posicao) })
+  }
 
   async function carregar() {
     setLoading(true)
@@ -589,20 +617,27 @@ export default function AdminClient() {
                   const numero = Number(etapa.numero_etapa)
                   const resultado = selectedProva.etapas_resultados.find(r => r.numero_etapa === numero)
                   const badge = importBadge(resultado?.import_status ?? null)
+                  const aberta = etapasAbertas.has(numero)
                   return (
-                    <div key={numero} className="card" style={{ marginBottom: 16, background: 'var(--surface-2)' }}>
+                    <div key={numero} className="card" style={{ marginBottom: 16, background: 'var(--surface-2)', padding: 0, overflow: 'hidden' }}>
                       <div
+                        onClick={() => alternarEtapaAberta(numero)}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          marginBottom: 16,
-                          borderBottom: '1px solid var(--border)',
-                          paddingBottom: 12,
+                          padding: 16,
+                          cursor: 'pointer',
+                          borderBottom: aberta ? '1px solid var(--border)' : 'none',
                         }}
                       >
-                        <div className="mono" style={{ fontSize: 16, fontWeight: 700 }}>
-                          Etapa {numero}{etapa.nome ? ` — ${etapa.nome}` : ''}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', transform: aberta ? 'rotate(90deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>
+                            ▶
+                          </span>
+                          <div className="mono" style={{ fontSize: 16, fontWeight: 700 }}>
+                            Etapa {numero}{etapa.nome ? ` — ${etapa.nome}` : ''}
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-dim)', alignItems: 'center' }}>
                           <span className="mono">{etapa.data_etapa ?? '—'}</span>
@@ -614,45 +649,58 @@ export default function AdminClient() {
                           </span>
                         </div>
                       </div>
-                      <div style={{ marginBottom: 12 }}>
-                        <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                          {etapa.distancia_km ?? '—'} km • +{etapa.elevacao_m ?? '—'} m • {etapa.perfil ?? '—'}
-                        </div>
-                        {(etapa.local_partida || etapa.local_chegada) && (
-                          <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                            {etapa.local_partida ?? '—'} → {etapa.local_chegada ?? '—'}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
-                        {(
-                          [
-                            ['Classificação Geral', !!resultado?.classificacao_geral_top20?.some(Boolean)],
-                            ['Sprint', !!resultado?.camisola_sprint],
-                            ['Montanha', !!resultado?.camisola_montanha],
-                            ['Juventude', !!resultado?.camisola_juventude],
-                          ] as const
-                        ).map(([label, presente]) => (
-                          <div key={label} className="card" style={{ padding: 12 }}>
-                            <div className="mono" style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{label}</div>
-                            <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: '50%',
-                                  background: presente ? '#146633' : 'var(--text-dim)',
-                                  display: 'inline-block',
-                                }}
-                              />
-                              {presente ? 'Guardado' : 'Falta'}
+
+                      {aberta && (
+                        <div style={{ padding: 16 }}>
+                          <div style={{ marginBottom: 12 }}>
+                            <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                              {etapa.distancia_km ?? '—'} km • +{etapa.elevacao_m ?? '—'} m • {etapa.perfil ?? '—'}
                             </div>
+                            {(etapa.local_partida || etapa.local_chegada) && (
+                              <div className="mono" style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                                {etapa.local_partida ?? '—'} → {etapa.local_chegada ?? '—'}
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                      <button className="btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: '8px 12px' }} onClick={() => abrirResultados(numero)}>
-                        Editar Resultados
-                      </button>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                            {(
+                              [
+                                ['Classificação Geral', resultado?.classificacao_geral_completa ?? null],
+                                ['Sprint', resultado?.sprint_completo ?? null],
+                                ['Montanha', resultado?.montanha_completo ?? null],
+                                ['Juventude', resultado?.juventude_completo ?? null],
+                              ] as const
+                            ).map(([label, linhas]) => {
+                              const presente = !!linhas && linhas.length > 0
+                              return (
+                                <div
+                                  key={label}
+                                  className="card"
+                                  onClick={() => presente && abrirRanking(`${label} — Etapa ${numero}`, linhas)}
+                                  style={{ padding: 12, cursor: presente ? 'pointer' : 'default' }}
+                                >
+                                  <div className="mono" style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{label}</div>
+                                  <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: '50%',
+                                        background: presente ? '#146633' : 'var(--text-dim)',
+                                        display: 'inline-block',
+                                      }}
+                                    />
+                                    {presente ? 'Guardado' : 'Falta'}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <button className="btn-secondary" style={{ marginTop: 12, fontSize: 12, padding: '8px 12px' }} onClick={() => abrirResultados(numero)}>
+                            Editar Resultados
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -871,6 +919,43 @@ export default function AdminClient() {
               </button>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowResultsModal(false)}>Cancelar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de classificação (ranking completo) */}
+      {rankingModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setRankingModal(null)}
+        >
+          <div className="card" style={{ maxWidth: 640, width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="display-lg" style={{ fontSize: 18 }}>{rankingModal.titulo}</div>
+              <button onClick={() => setRankingModal(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-dim)' }}>
+                ×
+              </button>
+            </div>
+            <table className="mono" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 8px' }}>Pos</th>
+                  <th style={{ padding: '6px 8px' }}>Nome</th>
+                  <th style={{ padding: '6px 8px' }}>Equipa</th>
+                  <th style={{ padding: '6px 8px' }}>Tempo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankingModal.linhas.map(l => (
+                  <tr key={l.posicao} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '6px 8px', fontWeight: 700 }}>{l.posicao}</td>
+                    <td style={{ padding: '6px 8px' }}>{l.nome}</td>
+                    <td style={{ padding: '6px 8px', color: 'var(--text-dim)' }}>{l.equipa || '—'}</td>
+                    <td style={{ padding: '6px 8px' }}>{l.tempo || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
