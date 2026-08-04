@@ -44,3 +44,26 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, total: registos.length, dnf: registos.filter(r => r.dnf).length })
 }
+
+/** Apaga toda a startlist (todos os ciclistas) de uma prova. */
+export async function DELETE(req: Request) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 })
+
+  const { provaId } = (await req.json()) as { provaId: string }
+  if (!provaId) {
+    return NextResponse.json({ error: 'provaId é obrigatório' }, { status: 400 })
+  }
+
+  const supabase = createAdminClient()
+
+  const { error } = await supabase.from('ciclistas_prova').delete().eq('prova_id', provaId)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await supabase
+    .from('provas')
+    .update({ startlist_sync_em: null, startlist_sync_status: null })
+    .eq('id', provaId)
+
+  return NextResponse.json({ ok: true })
+}
