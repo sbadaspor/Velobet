@@ -51,18 +51,21 @@ export async function POST(req: Request) {
       const lider = liderDaClassificacao(linhas)
       if (!lider) return NextResponse.json({ error: 'Não consegui identificar o líder do Sprint no texto colado.' }, { status: 422 })
       dados.camisola_sprint = lider
+      dados.sprint_completo = linhas
     }
     if (montanha?.trim()) {
       const linhas = parseClassificacao(montanha)
       const lider = liderDaClassificacao(linhas)
       if (!lider) return NextResponse.json({ error: 'Não consegui identificar o líder da Montanha no texto colado.' }, { status: 422 })
       dados.camisola_montanha = lider
+      dados.montanha_completo = linhas
     }
     if (juventude?.trim()) {
       const linhas = parseClassificacao(juventude)
       const lider = liderDaClassificacao(linhas)
       if (!lider) return NextResponse.json({ error: 'Não consegui identificar o líder da Juventude no texto colado.' }, { status: 422 })
       dados.camisola_juventude = lider
+      dados.juventude_completo = linhas
     }
   } catch {
     return NextResponse.json({ error: 'Erro a processar o texto colado. Confirma o formato.' }, { status: 422 })
