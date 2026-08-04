@@ -13,7 +13,7 @@ export async function GET() {
     .select(
       `id, nome, categoria, status, pcs_slug, data_inicio, data_fim, startlist_sync_em, startlist_sync_status,
        etapas_planeadas ( id, numero_etapa, nome, data_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, hora_inicio, rota_pontos ),
-       etapas_resultados ( id, numero_etapa, classificacao_geral_top20, camisola_sprint, camisola_montanha, camisola_juventude, import_status, import_erro, importado_em )`
+       etapas_resultados ( id, numero_etapa, classificacao_geral_top20, classificacao_geral_completa, camisola_sprint, camisola_montanha, camisola_juventude, sprint_completo, montanha_completo, juventude_completo, import_status, import_erro, importado_em )`
     )
     .order('nome')
 
