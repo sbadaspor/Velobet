@@ -126,6 +126,77 @@ export function parseStartlist(texto: string): LinhaStartlist[] {
   return resultado
 }
 
+/**
+ * Processa o texto extraído do PDF de startlist do procyclingstats
+ * (download direto do botão "PDF" na página da startlist). Formato
+ * observado (uma linha por entrada, sem espaços):
+ *
+ *   1UAE Team Emirates - XRG
+ *   1.ALMEIDA Joao
+ *   2.BJERG Mikkel
+ *   ...
+ *   11Red Bull - BORA -
+ *   hansgrohe
+ *   101.BOICHIS Adrien
+ *
+ * Uma linha de equipa é "número + texto" (sem ponto a seguir ao
+ * número); uma linha de ciclista é "número + ponto + nome". Nomes de
+ * equipa ou de ciclista que quebram para a linha seguinte (por serem
+ * compridos) são detetados como "linha de continuação" (não começa
+ * por número) e anexados à entrada anterior.
+ */
+export function parsePdfStartlistTexto(texto: string): LinhaStartlist[] {
+  const linhas = texto
+    .split('\n')
+    .map(l => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  const resultado: LinhaStartlist[] = []
+  let equipaAtual = ''
+  let ultimoTipo: 'equipa' | 'ciclista' | null = null
+  let ultimoNumeroEquipa = 0
+
+  const riderRegex = /^(\d+)\.(.+)$/
+  const teamRegex = /^(\d{1,3})(\D.+)$/
+  const dataRegex = /^\d{1,2}\/\d{1,2}\/\d{4}\b/
+  const ignorarRegex = /procyclingstats/i
+
+  for (const linha of linhas) {
+    if (dataRegex.test(linha) || ignorarRegex.test(linha)) continue
+
+    const riderMatch = linha.match(riderRegex)
+    if (riderMatch) {
+      const dorsal = parseInt(riderMatch[1], 10)
+      const nome = riderMatch[2].trim()
+      resultado.push({ nome, equipa: equipaAtual, dorsal, dnf: false, etapaAbandono: null })
+      ultimoTipo = 'ciclista'
+      continue
+    }
+
+    const teamMatch = linha.match(teamRegex)
+    if (teamMatch) {
+      const numeroEquipa = parseInt(teamMatch[1], 10)
+      // Se o número de equipa não continuar a aumentar, é provavelmente
+      // uma repetição do documento (ex: mesma lista noutra página) —
+      // paramos para não misturar dados.
+      if (ultimoNumeroEquipa > 0 && numeroEquipa <= ultimoNumeroEquipa) break
+      ultimoNumeroEquipa = numeroEquipa
+      equipaAtual = teamMatch[2].trim()
+      ultimoTipo = 'equipa'
+      continue
+    }
+
+    // Linha de continuação (nome de equipa ou de ciclista que quebrou para a linha seguinte)
+    if (ultimoTipo === 'equipa') {
+      equipaAtual = `${equipaAtual} ${linha}`.trim()
+    } else if (ultimoTipo === 'ciclista' && resultado.length > 0) {
+      resultado[resultado.length - 1].nome = `${resultado[resultado.length - 1].nome} ${linha}`.trim()
+    }
+  }
+
+  return resultado
+}
+
 /** Primeira linha (posição 1) de uma classificação = líder dessa camisola. */
 export function liderDaClassificacao(linhas: LinhaClassificacao[]): string | null {
   const primeiro = linhas.find(l => l.posicao === 1)
