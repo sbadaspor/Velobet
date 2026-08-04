@@ -1,32 +1,14 @@
-{
-  "name": "velobet",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.45.4",
-    "cheerio": "^1.0.0",
-    "leaflet": "^1.9.4",
-    "next": "^15.5.2",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
-  "devDependencies": {
-    "@types/leaflet": "^1.9.12",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "autoprefixer": "^10.4.20",
-    "eslint": "^8",
-    "eslint-config-next": "^15.5.2",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  }
-}
+Bom dia, o meu nome é Daniel e envio-te esta mensagem em representação da Prozis.
+Bem-vindo/a ao programa Prozis Elite! 
+
+Dentro de duas horas, terás acesso a uma conta de parceiro na nossa loja online.
+
+Para usufruir do desconto, basta:
+
+* aceder à loja online da Prozis Portugal: https://www.prozis.com/pt/pt/
+* fazer login com o seu email (@) e password (@)
+* adicionar os produtos que desejas comprar ao carrinho de compras
+* no início (Passo 1 do Checkout), verificar que está inserido o seu código de desconto único:  ELITE-PARTNER e o desconto é aplicado de imediato!
+
+No seguimento do protocolo estabelecido com a tua entidade patronal, tens acesso a um Kit boas vindas. 
+Aplica o cupão WELCOME-ELITE juntamente com o teu cupão de parceiro (Partner-Elite) e recebe os produtos assinalados na imagem em compras superiores a 34,99€
