@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { parseGpxParaPontosRota } from '@/lib/gpxParser'
 
 type EtapaPlaneada = {
   id?: string
@@ -71,6 +72,16 @@ function importBadge(status: string | null) {
   if (status === 'sucesso') return { label: 'Importada', color: '#146633', bg: 'rgba(22,163,74,0.14)' }
   if (status === 'falha') return { label: 'Falha', color: 'var(--red)', bg: 'rgba(208,69,42,0.14)' }
   return { label: 'Pendente', color: 'var(--text-dim)', bg: 'var(--surface-3)' }
+}
+
+/** Lê um ficheiro GPX e devolve o JSON de pontos da rota já pronto a colar no campo. Lança erro se não encontrar pontos de trajeto válidos. */
+async function lerGpxComoJson(ficheiro: File): Promise<string> {
+  const texto = await ficheiro.text()
+  const pontos = parseGpxParaPontosRota(texto)
+  if (pontos.length < 2) {
+    throw new Error('Não encontrei pontos de trajeto (trkpt) válidos neste ficheiro GPX.')
+  }
+  return JSON.stringify(pontos)
 }
 
 /** Verdadeiro se o texto estiver vazio (nada para validar) ou for um JSON válido de pontos de rota. */
@@ -370,6 +381,15 @@ export default function AdminClient() {
     setEditingProva({ ...editingProva, etapas })
   }
 
+  async function handleGpxUploadEtapaForm(index: number, ficheiro: File) {
+    try {
+      const json = await lerGpxComoJson(ficheiro)
+      atualizarEtapaForm(index, 'rota_pontos_texto', json)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Não foi possível ler este ficheiro GPX.')
+    }
+  }
+
   function adicionarEtapaForm() {
     if (!editingProva) return
     setEditingProva({ ...editingProva, etapas: [...editingProva.etapas, emptyEtapa()] })
@@ -392,6 +412,15 @@ export default function AdminClient() {
   function atualizarEditingEtapa(campo: keyof EtapaPlaneada, valor: string) {
     if (!editingEtapa) return
     setEditingEtapa({ ...editingEtapa, [campo]: valor })
+  }
+
+  async function handleGpxUploadEditingEtapa(ficheiro: File) {
+    try {
+      const json = await lerGpxComoJson(ficheiro)
+      atualizarEditingEtapa('rota_pontos_texto', json)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Não foi possível ler este ficheiro GPX.')
+    }
   }
 
   async function guardarEtapa() {
@@ -934,6 +963,21 @@ export default function AdminClient() {
                           placeholder='Ex: [{"lat":41.9,"lng":12.5,"elevation":120}, ...]'
                           style={{ width: '100%', minHeight: 50, padding: 6, border: '1px solid var(--border)', borderRadius: 4, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', boxSizing: 'border-box' }}
                         />
+                        <div style={{ marginTop: 4 }}>
+                          <label className="mono" style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                            ou carrega um ficheiro GPX (converte automaticamente):{' '}
+                            <input
+                              type="file"
+                              accept=".gpx,application/gpx+xml"
+                              onChange={e => {
+                                const ficheiro = e.target.files?.[0]
+                                if (ficheiro) handleGpxUploadEtapaForm(index, ficheiro)
+                                e.target.value = ''
+                              }}
+                              style={{ fontSize: 11 }}
+                            />
+                          </label>
+                        </div>
                       </div>
                     </div>
                   )
@@ -1045,6 +1089,21 @@ export default function AdminClient() {
                       placeholder='Ex: [{"lat":41.9,"lng":12.5,"elevation":120}, ...]'
                       style={{ width: '100%', minHeight: 60, padding: 8, border: '1px solid var(--border)', borderRadius: 4, fontSize: 12, fontFamily: 'JetBrains Mono, monospace', boxSizing: 'border-box' }}
                     />
+                    <div style={{ marginTop: 6 }}>
+                      <label className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                        ou carrega um ficheiro GPX (converte automaticamente):{' '}
+                        <input
+                          type="file"
+                          accept=".gpx,application/gpx+xml"
+                          onChange={e => {
+                            const ficheiro = e.target.files?.[0]
+                            if (ficheiro) handleGpxUploadEditingEtapa(ficheiro)
+                            e.target.value = ''
+                          }}
+                          style={{ fontSize: 11 }}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </>
               )
