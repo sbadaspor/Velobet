@@ -3,14 +3,14 @@ import { requireAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 type EtapaInput = {
-  numero: number | string
-  data?: string
-  perfil?: string
-  distancia?: number | string
-  desnivel?: number | string
-  local_partida?: string
-  local_chegada?: string
-  hora_inicio?: string
+  numero_etapa: number | string
+  data_etapa?: string | null
+  perfil?: string | null
+  distancia_km?: number | string | null
+  elevacao_m?: number | string | null
+  local_partida?: string | null
+  local_chegada?: string | null
+  hora_inicio?: string | null
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -49,14 +49,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // e só cria etapas novas para números que ainda não existem.
   if (etapas && etapas.length > 0) {
     for (const e of etapas) {
-      if (e.numero === '' || e.numero == null) continue
-      const numero = Number(e.numero)
+      if (e.numero_etapa === '' || e.numero_etapa == null) continue
+      const numero = Number(e.numero_etapa)
 
       const camposEtapa: Record<string, unknown> = {}
-      if (e.data) camposEtapa.data_etapa = e.data
+      if (e.data_etapa) camposEtapa.data_etapa = e.data_etapa
       if (e.perfil) camposEtapa.perfil = e.perfil
-      if (e.distancia !== '' && e.distancia != null) camposEtapa.distancia_km = Number(e.distancia)
-      if (e.desnivel !== '' && e.desnivel != null) camposEtapa.elevacao_m = Number(e.desnivel)
+      if (e.distancia_km !== '' && e.distancia_km != null) camposEtapa.distancia_km = Number(e.distancia_km)
+      if (e.elevacao_m !== '' && e.elevacao_m != null) camposEtapa.elevacao_m = Number(e.elevacao_m)
       if (e.local_partida) camposEtapa.local_partida = e.local_partida
       if (e.local_chegada) camposEtapa.local_chegada = e.local_chegada
       if (e.hora_inicio) camposEtapa.hora_inicio = e.hora_inicio
