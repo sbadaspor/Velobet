@@ -51,7 +51,16 @@ const LABELS: Record<Race, Record<JerseyTipo, string>> = {
   outra: { sprint: 'Sprint', montanha: 'Montanha', juventude: 'Juventude' },
 }
 
-function JerseyCircle({ palette }: { palette: Palette }) {
+/** Cor/padrão real da camisola, para usar fora deste componente (ex. ecrã Apostar). */
+export function getJerseyPalette(provaNome: string, tipo: JerseyTipo): Palette {
+  return PALETTES[detectRace(provaNome)][tipo]
+}
+
+export function getJerseyLabel(provaNome: string, tipo: JerseyTipo): string {
+  return LABELS[detectRace(provaNome)][tipo]
+}
+
+export function JerseyCircle({ palette }: { palette: Palette }) {
   const patternId = useId()
   if (palette.dotColor) {
     return (
