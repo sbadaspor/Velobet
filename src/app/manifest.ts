@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'VeloApostas',
-    short_name: 'VeloApostas',
+    name: 'Velo Bet',
+    short_name: 'Velo Bet',
     description: 'Sistema de apostas de ciclismo entre amigos',
     start_url: '/',
     display: 'standalone',
