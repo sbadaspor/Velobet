@@ -222,7 +222,7 @@ export default function HistoricoPage() {
       const [{ data: histData }, { data: provasData }, { data: perfisData }] = await Promise.all([
         supabase.from('apostas_historicas').select('*'),
         supabase.from('provas').select('id, nome, categoria, status').eq('status', 'finalizada'),
-        supabase.from('perfis_publicos').select('username, avatar_url'),
+        supabase.from('perfis').select('username, avatar_url'),
       ])
 
       const avatarByUsername: Record<string, string | null> = {}
