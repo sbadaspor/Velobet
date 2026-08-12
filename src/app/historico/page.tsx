@@ -426,7 +426,7 @@ export default function HistoricoPage() {
         </div>
         <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
           <span className="w-3 h-3 rounded-full bg-gold" />
-          <span>Tour · 2026</span>
+          <span>Velo Bet</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
           <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden cursor-pointer">
