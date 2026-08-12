@@ -6,10 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { calcularPontos, compararDesempate, getConfigCategoria, type CategoriaProvaTipo } from '@/lib/pontuacao'
 import JerseyBadge from '@/components/JerseyBadge'
 
-// Paleta fixa para as linhas do gráfico de evolução — mesma ordem
-// sempre, registada no design system (Chart — Evolução).
-const CHART_COLORS = ['#E0A916', '#211D15', '#146633', '#B5651D', '#1E40AF', '#6E7480']
-
 // ── Ícones (mesmo estilo outline das outras páginas) ──
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
@@ -58,11 +54,19 @@ type Prova = {
   status: string
 }
 
+type LinhaClassificacao = {
+  posicao: number
+  nome: string
+  equipa?: string
+  tempo: string
+}
+
 type EtapaResultado = {
   id: string
   prova_id: string
   numero_etapa: number
   classificacao_geral_top20: string[]
+  classificacao_geral_completa: LinhaClassificacao[] | null
   tempos_classificacao: Record<string, string> | null
   camisola_sprint: string | null
   camisola_montanha: string | null
@@ -88,40 +92,12 @@ type PlayerStanding = {
   top20: number
 }
 
-type EvolutionSeries = {
-  userId: string
-  name: string
-  color: string
-  series: number[]
-}
-
 type CompData = {
   prova: Prova
   etapas: EtapaResultado[]
   hasStandings: boolean
   generalStandings: PlayerStanding[]
-  evolution: EvolutionSeries[]
-  stageHighlight: { stage: number; text: string } | null
 }
-
-function buildLinePath(series: number[], maxPoints: number, width: number, height: number, padding: number) {
-  const n = series.length
-  if (n === 0) return ''
-  const chartWidth = width - padding * 2
-  const chartHeight = height - padding * 2
-  return series
-    .map((pts, i) => {
-      const x = padding + (n === 1 ? 0 : (i / (n - 1)) * chartWidth)
-      const y = padding + chartHeight - (maxPoints === 0 ? 0 : (pts / maxPoints) * chartHeight)
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-    })
-    .join(' ')
-}
-
-const CHART_W = 400
-const CHART_H = 180
-const CHART_PAD = 28
-const GRID_LINES = 4
 
 export default function ClassificacaoPage() {
   const [loading, setLoading] = useState(true)
@@ -184,8 +160,6 @@ export default function ClassificacaoPage() {
             etapas,
             hasStandings: false,
             generalStandings: [],
-            evolution: [],
-            stageHighlight: null,
           })
           continue
         }
@@ -226,48 +200,7 @@ export default function ClassificacaoPage() {
           top20: c.top20,
         }))
 
-        const evolution: EvolutionSeries[] = computados.map((c, idx) => {
-          const aposta = apostas.find(a => a.user_id === c.userId)!
-          const series = etapas.map(etapa => {
-            const camisolasApostadas = {
-              sprint: aposta.camisola_sprint ?? '',
-              montanha: aposta.camisola_montanha ?? '',
-              juventude: aposta.camisola_juventude ?? '',
-            }
-            const camisolasReais = {
-              sprint: etapa.camisola_sprint ?? '',
-              montanha: etapa.camisola_montanha ?? '',
-              juventude: etapa.camisola_juventude ?? '',
-            }
-            return calcularPontos(aposta.apostas_top20, etapa.classificacao_geral_top20, camisolasApostadas, camisolasReais, categoria).pontos_total
-          })
-          return { userId: c.userId, name: c.name, color: CHART_COLORS[idx % CHART_COLORS.length], series }
-        })
-
-        // Destaque: última mudança de líder ao longo das etapas
-        let stageHighlight: CompData['stageHighlight'] = null
-        if (evolution.length > 0 && etapas.length > 1) {
-          let leaderIdx = -1
-          for (let i = 0; i < etapas.length; i++) {
-            let bestIdx = 0
-            let bestPts = -Infinity
-            evolution.forEach((e, idx) => {
-              if (e.series[i] > bestPts) {
-                bestPts = e.series[i]
-                bestIdx = idx
-              }
-            })
-            if (leaderIdx !== -1 && bestIdx !== leaderIdx) {
-              stageHighlight = {
-                stage: etapas[i].numero_etapa,
-                text: `${evolution[bestIdx].name} passou a liderar com ${bestPts} pts`,
-              }
-            }
-            leaderIdx = bestIdx
-          }
-        }
-
-        results.push({ prova, etapas, hasStandings: true, generalStandings, evolution, stageHighlight })
+        results.push({ prova, etapas, hasStandings: true, generalStandings })
       }
 
       setComps(results)
@@ -341,14 +274,23 @@ export default function ClassificacaoPage() {
             {comps.map(comp => {
               const idx = stageIdx[comp.prova.id] ?? comp.etapas.length - 1
               const etapaAtual = comp.etapas[idx]
-              const maxPoints = Math.max(1, ...comp.evolution.flatMap(e => e.series))
+              const ehFinal = comp.prova.status === 'finalizada'
 
               return (
                 <div key={comp.prova.id}>
                   <div className="flex items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="eyebrow">{comp.prova.nome}</div>
+                    <div>
+                      <div className="eyebrow mb-1">{comp.prova.nome}</div>
                       <div className="display-lg">Classificação</div>
+                      <span
+                        className="mono text-[9px] font-bold uppercase inline-block mt-1 px-1.5 py-0.5 rounded-sm"
+                        style={{
+                          background: ehFinal ? 'var(--surface-3)' : 'var(--gold-soft)',
+                          color: ehFinal ? 'var(--text-dim)' : 'var(--gold-ink)',
+                        }}
+                      >
+                        {ehFinal ? 'Final' : 'Atual'}
+                      </span>
                     </div>
                     <span className="badge-status badge-a-decorrer">
                       <span className="dot" />A Decorrer
@@ -417,68 +359,9 @@ export default function ClassificacaoPage() {
                         ))}
                       </div>
 
-                      {/* Evolução por etapa */}
-                      <div className="card mb-8">
-                        <div className="display-lg mb-3">Evolução por etapa</div>
-
-                        {comp.stageHighlight && (
-                          <div
-                            className="text-sm mb-3 px-4 py-3 rounded-md"
-                            style={{ background: 'var(--surface-3)', borderLeft: '3px solid var(--gold)' }}
-                          >
-                            <strong>Etapa {comp.stageHighlight.stage}:</strong> {comp.stageHighlight.text}
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-4 mb-3">
-                          {comp.evolution.map(e => (
-                            <div key={e.userId} className="flex items-center gap-1.5 text-xs text-text-dim">
-                              <span className="inline-block w-3 h-0.5 rounded-sm" style={{ background: e.color }} />
-                              {e.name}
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="bg-surface-2 border border-border rounded-lg p-4">
-                          <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" className="w-full" style={{ height: 180 }}>
-                            {Array.from({ length: GRID_LINES - 1 }).map((_, i) => {
-                              const y = CHART_PAD + ((i + 1) / GRID_LINES) * (CHART_H - CHART_PAD * 2)
-                              return <line key={i} x1={CHART_PAD} y1={y} x2={CHART_W - CHART_PAD} y2={y} stroke="rgba(107,100,85,0.08)" strokeWidth={0.5} />
-                            })}
-                            {Array.from({ length: GRID_LINES + 1 }).map((_, i) => {
-                              const y = CHART_PAD + (i / GRID_LINES) * (CHART_H - CHART_PAD * 2)
-                              const val = Math.round(((GRID_LINES - i) / GRID_LINES) * maxPoints)
-                              return (
-                                <text key={i} x={CHART_PAD - 8} y={y + 3} fontFamily="JetBrains Mono, monospace" fontSize={9} fontWeight={500} textAnchor="end" fill="#6B6455">
-                                  {val}
-                                </text>
-                              )
-                            })}
-                            {comp.evolution.map(e => (
-                              <path
-                                key={e.userId}
-                                d={buildLinePath(e.series, maxPoints, CHART_W, CHART_H, CHART_PAD)}
-                                stroke={e.color}
-                                strokeWidth={1.5}
-                                fill="none"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            ))}
-                            <line x1={CHART_PAD} y1={CHART_PAD} x2={CHART_PAD} y2={CHART_H - CHART_PAD} stroke="#DED7C6" strokeWidth={1} />
-                            <line x1={CHART_PAD} y1={CHART_H - CHART_PAD} x2={CHART_W - CHART_PAD} y2={CHART_H - CHART_PAD} stroke="#DED7C6" strokeWidth={1} />
-                          </svg>
-                          <div className="flex justify-between mt-2 mono text-[10px] text-text-dim tracking-wide">
-                            {comp.etapas.map(e => (
-                              <span key={e.id}>E{e.numero_etapa}</span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Top 20 da etapa selecionada */}
+                      {/* Classificação geral (completa) da etapa selecionada */}
                       <div className="text-sm font-semibold text-text-dim mb-3">
-                        Classificação Top 20 — Geral da etapa {etapaAtual.numero_etapa}
+                        Classificação Geral da etapa {etapaAtual.numero_etapa}
                       </div>
                       <div className="table-wrapper" style={{ maxHeight: 340, overflowY: 'auto' }}>
                         <table>
@@ -490,11 +373,19 @@ export default function ClassificacaoPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {etapaAtual.classificacao_geral_top20.map((ciclista, i) => (
-                              <tr key={ciclista + i}>
-                                <td className={`mono font-extrabold ${medalClass(i + 1)}`}>{i + 1}</td>
-                                <td className="font-semibold">{ciclista}</td>
-                                <td className="mono font-semibold">{etapaAtual.tempos_classificacao?.[ciclista] ?? '—'}</td>
+                            {(
+                              etapaAtual.classificacao_geral_completa && etapaAtual.classificacao_geral_completa.length > 0
+                                ? [...etapaAtual.classificacao_geral_completa].sort((a, b) => a.posicao - b.posicao)
+                                : etapaAtual.classificacao_geral_top20.map((nome, i) => ({
+                                    posicao: i + 1,
+                                    nome,
+                                    tempo: etapaAtual.tempos_classificacao?.[nome] ?? '',
+                                  }))
+                            ).map(linha => (
+                              <tr key={linha.nome + linha.posicao}>
+                                <td className={`mono font-extrabold ${medalClass(linha.posicao)}`}>{linha.posicao}</td>
+                                <td className="font-semibold">{linha.nome}</td>
+                                <td className="mono font-semibold">{linha.tempo || etapaAtual.tempos_classificacao?.[linha.nome] || '—'}</td>
                               </tr>
                             ))}
                           </tbody>
