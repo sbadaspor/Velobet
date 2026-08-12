@@ -607,6 +607,12 @@ export default function HistoricoPage() {
                       >
                         <div className="flex items-center gap-3">
                           <div className={`mono font-extrabold text-sm min-w-[20px] ${medalClass(i + 1)}`}>{i + 1}</div>
+                          <div className="w-8 h-8 rounded-full bg-surface-3 border border-border overflow-hidden flex-shrink-0">
+                            {avatarMap[entry.username] && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={avatarMap[entry.username]!} alt="" className="w-full h-full object-cover" />
+                            )}
+                          </div>
                           <div className="flex-1 font-semibold text-sm truncate">{entry.name}</div>
                           <div className="mono font-bold text-sm text-text-dim">{entry.points} pts</div>
                           <div
