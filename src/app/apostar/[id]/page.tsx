@@ -48,6 +48,20 @@ export default function ApostarPage() {
   const userIdRef = useRef<string | null>(null)
   const hydrated = useRef(false)
 
+  // No iOS Safari, a barra do teclado (setas + "concluído") fica fixa no
+  // ecrã e não empurra o layout — sem isto, a lista de pesquisa fica
+  // parcialmente escondida por trás dela. O visualViewport dá-nos a altura
+  // real ainda visível (já sem o teclado) para ajustarmos o painel.
+  const [alturaVisivel, setAlturaVisivel] = useState<number | null>(null)
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    const atualizar = () => setAlturaVisivel(vv.height)
+    atualizar()
+    vv.addEventListener('resize', atualizar)
+    return () => vv.removeEventListener('resize', atualizar)
+  }, [])
+
   useEffect(() => {
     ;(async () => {
       const supabase = createClient()
@@ -322,10 +336,14 @@ export default function ApostarPage() {
       )}
 
       {search && (
-        <div className="fixed inset-0 z-30 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={fecharBusca}>
+        <div
+          className="fixed inset-x-0 top-0 z-30 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.5)', height: alturaVisivel ? `${alturaVisivel}px` : '100vh' }}
+          onClick={fecharBusca}
+        >
           <div
             className="w-full max-w-[560px] bg-surface rounded-t-xl flex flex-col"
-            style={{ maxHeight: '80vh' }}
+            style={{ maxHeight: '90%' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 p-4 border-b border-border">
