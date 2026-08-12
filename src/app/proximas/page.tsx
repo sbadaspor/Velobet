@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { RoutePoint } from '@/components/RouteMap'
@@ -107,9 +108,11 @@ function diasAte(iso: string) {
 }
 
 export default function ProximasPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [provas, setProvas] = useState<ProvaRow[]>([])
   const [etapasPorProva, setEtapasPorProva] = useState<Record<string, EtapaPlaneada[]>>({})
+  const [provasComStartlist, setProvasComStartlist] = useState<Set<string>>(new Set())
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
   const [menuOpen, setMenuOpen] = useState(false)
@@ -153,6 +156,14 @@ export default function ProximasPage() {
           grouped[etapa.prova_id].push(etapa)
         })
         setEtapasPorProva(grouped)
+
+        // "Apostar" só deve poder ser clicado se já houver startlist carregada.
+        const { data: ciclistasData } = await supabase
+          .from('ciclistas_prova')
+          .select('prova_id')
+          .in('prova_id', provasList.map(p => p.id))
+
+        setProvasComStartlist(new Set((ciclistasData ?? []).map((c: { prova_id: string }) => c.prova_id)))
       }
 
       setLoading(false)
@@ -171,13 +182,13 @@ export default function ProximasPage() {
         daysLeft,
         isOngoing,
         urgent: daysLeft > 0 && daysLeft <= 7,
-        disabled: prova.status !== 'aberta',
+        disabled: prova.status !== 'aberta' || !provasComStartlist.has(prova.id),
         stagesDetails: etapasPorProva[prova.id] ?? [],
       }
     })
 
     return lista.sort((a, b) => (a.isOngoing ? -1 : a.daysLeft) - (b.isOngoing ? -1 : b.daysLeft))
-  }, [provas, etapasPorProva])
+  }, [provas, etapasPorProva, provasComStartlist])
 
   if (loading) return null
 
@@ -260,7 +271,7 @@ export default function ProximasPage() {
                         <button
                           className="btn-primary text-xs px-3.5 py-2"
                           disabled={comp.disabled}
-                          onClick={e => e.stopPropagation()}
+                          onClick={e => { e.stopPropagation(); router.push(`/apostar/${comp.id}`) }}
                         >
                           Apostar
                         </button>
