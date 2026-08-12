@@ -3,25 +3,10 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { isPushSupported, subscribeToPush } from '@/lib/pushNotifications'
 
 // Ecrãs principais onde o cartão pode aparecer (só depois do login).
 const ECRAS_PRINCIPAIS = ['/hoje', '/proximas', '/classificacao', '/historico', '/perfil']
-
-// Se ela fechar ("Agora não" / ✕ / clicar fora), não voltamos a mostrar
-// antes de passarem estes dias — evita ser intrusivo a aparecer todos os dias.
-const DIAS_ATE_REAPARECER = 7
-const CHAVE_DISMISS = 'velobet_notif_dismissed_at'
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = atob(base64)
-  const outputArray = new Uint8Array(rawData.length)
-  for (let i = 0; i < rawData.length; i++) {
-    outputArray[i] = rawData.charCodeAt(i)
-  }
-  return outputArray
-}
 
 export default function NotificationGate() {
   const pathname = usePathname()
@@ -31,6 +16,11 @@ export default function NotificationGate() {
   const [isOpen, setIsOpen] = useState(false)
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [entrar, setEntrar] = useState(false) // controla a animação de entrada
+
+  // "Fechei isto agora" — só dura enquanto a app estiver aberta (não é
+  // guardado em disco). Ao sair e voltar a entrar na app (nova sessão),
+  // isto reinicia e o cartão pode voltar a aparecer, como pedido.
+  const [dispensadoNestaSessao, setDispensadoNestaSessao] = useState(false)
 
   // Regista o service worker uma vez, independentemente de mostrar o cartão —
   // é preciso já estar registado para o pushManager.subscribe() funcionar.
@@ -47,14 +37,11 @@ export default function NotificationGate() {
     async function verificar() {
       if (typeof window === 'undefined') return
       if (!ECRAS_PRINCIPAIS.some((rota) => pathname?.startsWith(rota))) return
-      if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+      if (!isPushSupported()) return
+      // Se já ativou ou já bloqueou antes, o browser guarda isso para sempre
+      // (não é algo que nós controlemos) — só mostramos quando ainda não decidiu.
       if (Notification.permission !== 'default') return
-
-      const dismissedAt = localStorage.getItem(CHAVE_DISMISS)
-      if (dismissedAt) {
-        const dias = (Date.now() - Number(dismissedAt)) / (1000 * 60 * 60 * 24)
-        if (dias < DIAS_ATE_REAPARECER) return
-      }
+      if (dispensadoNestaSessao) return
 
       const { data } = await supabase.auth.getUser()
       if (!ativo) return
@@ -68,7 +55,7 @@ export default function NotificationGate() {
       ativo = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
+  }, [pathname, dispensadoNestaSessao])
 
   useEffect(() => {
     if (!podeMostrar) return
@@ -77,10 +64,10 @@ export default function NotificationGate() {
     return () => clearTimeout(t)
   }, [podeMostrar])
 
-  function fechar(guardarDismiss: boolean) {
+  function fechar(dispensarSessao: boolean) {
     setEntrar(false)
-    if (guardarDismiss) {
-      localStorage.setItem(CHAVE_DISMISS, String(Date.now()))
+    if (dispensarSessao) {
+      setDispensadoNestaSessao(true)
     }
     setTimeout(() => {
       setIsOpen(false)
@@ -101,33 +88,14 @@ export default function NotificationGate() {
           return
         }
 
-        const registration = await navigator.serviceWorker.ready
-        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-
-        if (vapidPublicKey) {
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-          })
-
-          const json = subscription.toJSON()
-          const { data } = await supabase.auth.getUser()
-
-          if (data.user && json.endpoint && json.keys?.p256dh && json.keys?.auth) {
-            await supabase.from('push_subscriptions').upsert(
-              {
-                user_id: data.user.id,
-                subscription_endpoint: json.endpoint,
-                subscription_key_p256dh: json.keys.p256dh,
-                subscription_key_auth: json.keys.auth,
-              },
-              { onConflict: 'user_id,subscription_endpoint' }
-            )
-          }
+        const { data } = await supabase.auth.getUser()
+        if (data.user) {
+          await subscribeToPush(supabase, data.user.id)
         }
 
-        // já não precisa de guardar dismiss — permission passou a "granted",
-        // por isso a verificação seguinte já não mostra o cartão outra vez.
+        // Não precisa de "dispensar sessão" — a permissão já passou a
+        // "granted", e é isso que impede o cartão de voltar a aparecer,
+        // agora e em qualquer sessão futura.
         setTimeout(() => fechar(false), 2000)
       } catch {
         fechar(true)
