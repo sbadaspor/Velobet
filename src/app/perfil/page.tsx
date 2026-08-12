@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import NotificationToggle from '@/components/NotificationToggle'
 
 const LOCALIDADES = [
   'Aveiro', 'Beja', 'Braga', 'Bragança', 'Castelo Branco', 'Coimbra',
@@ -460,6 +461,8 @@ export default function PerfilPage() {
                 <div className="text-sm font-medium mono">{perfil?.telefone}</div>
               </div>
             </div>
+
+            <NotificationToggle />
 
             <button className="btn-secondary w-full mt-6" onClick={() => setEditing(true)}>
               Editar perfil
