@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { notificarAberturaSeNecessario } from '@/lib/notificacoesGatilhos'
 
 type EtapaInput = {
   numero_etapa: number | string
@@ -99,6 +100,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         await supabase.from('etapas_planeadas').insert({ prova_id: id, numero_etapa: numero, ...camposEtapa })
       }
     }
+  }
+
+  // Notifica os jogadores se esta alteração acabou de deixar a prova
+  // "aberta + com startlist" (só dispara uma vez por prova).
+  if (status !== undefined) {
+    await notificarAberturaSeNecessario(supabase, id)
   }
 
   return NextResponse.json({ ok: true })
