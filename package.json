@@ -16,7 +16,8 @@
     "next": "^15.5.2",
     "pdf-parse": "1.1.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.12",
@@ -24,6 +25,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^8",
     "eslint-config-next": "^15.5.2",
