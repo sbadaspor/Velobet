@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { RoutePoint } from '@/components/RouteMap'
-import ElevationProfile from '@/components/ElevationProfile'
+import InteractiveElevationProfile from '@/components/InteractiveElevationProfile'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const MESES = [
@@ -331,7 +331,7 @@ export default function HojePage() {
             {proximaEtapa.rotaPontos && proximaEtapa.rotaPontos.length >= 2 && (
               <>
                 <div className="divider" />
-                <ElevationProfile
+                <InteractiveElevationProfile
                   pontos={proximaEtapa.rotaPontos}
                   distanciaKm={proximaEtapa.distancia ?? 0}
                   height={90}
