@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { parseStartlist } from '@/lib/pcsParser'
+import { notificarAberturaSeNecessario } from '@/lib/notificacoesGatilhos'
 
 export async function POST(req: Request) {
   const admin = await requireAdmin()
@@ -41,6 +42,10 @@ export async function POST(req: Request) {
     .eq('id', provaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Notifica os jogadores se isto acabou de deixar a prova "aberta + com
+  // startlist" (só dispara uma vez por prova).
+  await notificarAberturaSeNecessario(supabase, provaId)
 
   return NextResponse.json({ ok: true, total: registos.length, dnf: registos.filter(r => r.dnf).length })
 }
