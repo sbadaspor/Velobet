@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { parseClassificacao, parseStartlist, liderDaClassificacao } from '@/lib/pcsParser'
 import { fetchClassificacaoTexto, fetchStartlistTexto, buildStageUrl, buildStartlistUrl } from '@/lib/pcsFetch'
+import {
+  notificarAberturaSeNecessario,
+  notificarResultadosImportados,
+  verificarLembretesApostas,
+} from '@/lib/notificacoesGatilhos'
 
 /**
  * Corre uma vez por dia (Vercel Cron, ver vercel.json — 17h UTC = 18h
@@ -68,6 +73,7 @@ export async function GET(req: Request) {
         .from('provas')
         .update({ startlist_sync_em: new Date().toISOString(), startlist_sync_status: 'sucesso' })
         .eq('id', prova.id)
+      await notificarAberturaSeNecessario(supabase, prova.id)
       detalhes.push(`${prova.nome}: startlist ok (${registos.length} ciclistas).`)
     } catch (e) {
       algumaFalha = true
@@ -95,6 +101,13 @@ export async function GET(req: Request) {
     }
 
     const numero = etapaHoje.numero_etapa
+
+    const { data: etapaAnterior } = await supabase
+      .from('etapas_resultados')
+      .select('import_status')
+      .eq('prova_id', prova.id)
+      .eq('numero_etapa', numero)
+      .maybeSingle()
 
     try {
       const [geralTexto, sprintTexto, montanhaTexto, juventudeTexto] = await Promise.all([
@@ -132,6 +145,7 @@ export async function GET(req: Request) {
         },
         { onConflict: 'prova_id,numero_etapa' }
       )
+      await notificarResultadosImportados(supabase, prova.nome, numero, etapaAnterior?.import_status)
       detalhes.push(`${prova.nome}: etapa ${numero} importada com sucesso.`)
     } catch (e) {
       algumaFalha = true
@@ -142,6 +156,14 @@ export async function GET(req: Request) {
       )
       detalhes.push(`${prova.nome}: falha a importar etapa ${numero} (${msg}).`)
     }
+  }
+
+  // Lembretes de "faltam N dias para fechar as apostas" — corre sempre,
+  // independentemente de a importação da procyclingstats ter funcionado.
+  try {
+    await verificarLembretesApostas(supabase)
+  } catch (e) {
+    detalhes.push(`Lembretes de apostas: falha (${e instanceof Error ? e.message : 'erro desconhecido'}).`)
   }
 
   await supabase.from('importacoes_log').insert({ sucesso: !algumaFalha, detalhes: detalhes.join(' | ') })
