@@ -12,9 +12,6 @@ const MESES = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
 
-// Vazio até a etapa finalizar e existirem resultados reais.
-const classificacaoTop20: { posicao: number; nome: string; tempo: string }[] = []
-
 function formatarData(date: Date) {
   return {
     diaSemana: DIAS[date.getDay()],
@@ -113,6 +110,7 @@ type EtapaRow = {
 
 type ProximaEtapa = {
   numero: number
+  provaId: string
   titulo: string
   perfil: string | null
   distancia: number | null
@@ -121,6 +119,8 @@ type ProximaEtapa = {
   daysLeft: number
   rotaPontos: RoutePoint[] | null
 }
+
+type LinhaTop20 = { posicao: number; nome: string; tempo: string }
 
 export default function HojePage() {
   const [now, setNow] = useState<Date | null>(null)
@@ -131,6 +131,7 @@ export default function HojePage() {
   const [dadosCarregados, setDadosCarregados] = useState(false)
   const [provas, setProvas] = useState<ProvaRow[]>([])
   const [etapas, setEtapas] = useState<EtapaRow[]>([])
+  const [classificacaoTop20, setClassificacaoTop20] = useState<LinhaTop20[]>([])
 
   useEffect(() => {
     setNow(new Date())
@@ -197,6 +198,7 @@ export default function HojePage() {
 
     return {
       numero: candidata.numero_etapa,
+      provaId: candidata.prova_id,
       titulo: candidata.local_chegada || `Etapa ${candidata.numero_etapa}`,
       perfil: candidata.perfil,
       distancia: candidata.distancia_km,
@@ -206,6 +208,41 @@ export default function HojePage() {
       rotaPontos: candidata.rota_pontos,
     }
   }, [etapas, provas])
+
+  // Classificação Geral da etapa mostrada em cima (só existe depois de a
+  // etapa ter resultados importados — antes disso fica "Ainda sem resultados").
+  useEffect(() => {
+    if (!proximaEtapa) {
+      setClassificacaoTop20([])
+      return
+    }
+
+    let ativo = true
+    const supabase = createClient()
+    ;(async () => {
+      const { data } = await supabase
+        .from('etapas_resultados')
+        .select('classificacao_geral_top20, tempos_classificacao')
+        .eq('prova_id', proximaEtapa.provaId)
+        .eq('numero_etapa', proximaEtapa.numero)
+        .maybeSingle()
+
+      if (!ativo) return
+
+      const nomes = (data?.classificacao_geral_top20 ?? []) as string[]
+      const tempos = (data?.tempos_classificacao ?? {}) as Record<string, string>
+
+      const linhas: LinhaTop20[] = nomes
+        .map((nome, i) => ({ posicao: i + 1, nome, tempo: tempos[nome] ?? '' }))
+        .filter(l => l.nome && l.nome.trim() !== '')
+
+      setClassificacaoTop20(linhas)
+    })()
+
+    return () => {
+      ativo = false
+    }
+  }, [proximaEtapa?.provaId, proximaEtapa?.numero])
 
   if (!now || !dadosCarregados) return null
 
