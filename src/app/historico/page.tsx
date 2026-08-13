@@ -399,7 +399,7 @@ export default function HistoricoPage() {
   return (
     <div className="min-h-screen bg-bg">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-bg">
         <div className="flex-1 flex items-center relative">
           <button className="text-xl text-text" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           {menuOpen && (
@@ -715,7 +715,7 @@ export default function HistoricoPage() {
       </div>
 
       {/* Bottom tab bar */}
-      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
+      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-bg">
         {TABS.map(tab => (
           <Link key={tab.label} href={tab.href} className="flex-1 cursor-pointer">
             <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold uppercase tracking-wide bottom-nav-item">
