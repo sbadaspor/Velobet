@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { parsePdfStartlistTexto } from '@/lib/pcsParser'
+import { notificarAberturaSeNecessario } from '@/lib/notificacoesGatilhos'
 
 // Importa o ficheiro interno da lib (não o "pdf-parse" principal) —
 // o index.js do pacote corre código de debug (tenta ler um PDF de
@@ -69,6 +70,8 @@ export async function POST(req: Request) {
     .eq('id', provaId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await notificarAberturaSeNecessario(supabase, provaId)
 
   return NextResponse.json({ ok: true, total: registos.length, dnf: registos.filter(r => r.dnf).length })
 }
