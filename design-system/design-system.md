@@ -194,6 +194,16 @@ Usado dentro do card hero (DIST./ASC./ORDEM) e em cards de resumo (pontos, posi�
 ### 6.8 Contador (countdown)
 Label eyebrow ("RESTAM") por cima de valor mono `stat-lg`, cor `--gold` quando resta pouco tempo (urgência), `--on-ink`/`--text` em estado neutro. Separador vertical fino entre "Deadline" (hora fixa) e "Restam" (contagem decrescente).
 
+**Caso de uso real: contagem em tempo real de dias/horas/minutos/segundos.** O exemplo original (`02:14:07`) só cobre o caso "mesmo dia" (HH:MM:SS). Na prática há contagens que começam a dias de distância (ex.: até à hora de início de uma etapa) — o componente tem de suportar também um valor de **dias**. Regras funcionais (não negociáveis na fase de implementação, independentemente do tratamento visual final):
+
+- Cada unidade (dias/horas/minutos/segundos) usa **largura fixa** (2 dígitos, zero à esquerda: `05`, `02`) para o valor não "saltar" de largura a cada tick de 1 segundo.
+- Sempre mono, sempre `tabular-nums`.
+- Atualiza a sério a cada segundo (não é um valor estático).
+- Urgência (`--gold`) quando resta pouco tempo — o limiar exato (ex. <24h, <1h) fica ao critério do mockup, mas tem de haver um estado neutro e um estado de urgência claramente distintos.
+- Quando não há hora de início definida para o que se está a contar, o ecrã usa um texto simples alternativo (fora do âmbito deste componente) — este componente cobre só o estado "contagem ativa".
+
+**Nota**: esta subsecção está numa fase intermédia — o tratamento visual exato (linha única `2d 05:34:12` vs. blocos separados por unidade, com ou sem divisores, etc.) vai ser decidido a partir de um mockup dedicado (handoff do Claude Design) e esta secção será atualizada com o resultado final depois de implementado. Por agora fixa-se aqui só o contrato funcional acima.
+
 ### 6.9 Card claro (info card)
 `--surface`, `1px solid var(--border)`, `radius-lg`, padding 20px. Estrutura livre, mas tipicamente: eyebrow no topo, depois ícone/imagem + título (Archivo 600) + subtítulo (`body-sm`, `--text-dim`) + valor em destaque (mono `stat-md`).
 
