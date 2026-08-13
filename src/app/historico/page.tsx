@@ -43,18 +43,10 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 10.26 23.77 10.26 17.39 15.04 20.49 23.31 12 18.54 3.51 23.31 6.61 15.04 0.23 10.26 8.91 10.26 12 2" />
   </svg>
 )
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-)
-
 const TABS: { label: string; icon: () => React.ReactElement; href: string }[] = [
   { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
   { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
-  { label: 'Eu', icon: UserIcon, href: '/perfil' },
 ]
 
 function medalClass(pos: number) {
