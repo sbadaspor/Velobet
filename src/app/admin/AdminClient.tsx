@@ -59,6 +59,17 @@ type Prova = {
 
 type UltimaImportacao = { executado_em: string; sucesso: boolean; detalhes: string | null } | null
 
+type JogadorAposta = {
+  user_id: string
+  username: string
+  full_name: string | null
+  avatar_url: string | null
+  apostas_top20: string[] | null
+  camisola_sprint: string | null
+  camisola_montanha: string | null
+  camisola_juventude: string | null
+}
+
 const CATEGORIAS = ['grande_volta', 'prova_semana', 'monumento', 'prova_dia']
 const STATUSES = ['aberta', 'fechada', 'finalizada']
 
@@ -145,6 +156,16 @@ export default function AdminClient() {
   const [showEtapaModal, setShowEtapaModal] = useState(false)
   const [editingEtapa, setEditingEtapa] = useState<EtapaPlaneada | null>(null)
   const [savingEtapa, setSavingEtapa] = useState(false)
+
+  const [confirmarApagarResultados, setConfirmarApagarResultados] = useState<{ numeroEtapa: number; texto: string } | null>(null)
+  const [apagandoResultados, setApagandoResultados] = useState(false)
+
+  const [apostasPanelAberto, setApostasPanelAberto] = useState(false)
+  const [apostasJogadores, setApostasJogadores] = useState<JogadorAposta[]>([])
+  const [apostasLoading, setApostasLoading] = useState(false)
+  const [editingJogadorId, setEditingJogadorId] = useState<string | null>(null)
+  const [apostaForm, setApostaForm] = useState<{ top20: string[]; sprint: string; montanha: string; juventude: string } | null>(null)
+  const [savingAposta, setSavingAposta] = useState(false)
 
   function alternarEtapaAberta(numero: number) {
     setEtapasAbertas(anterior => {
@@ -374,6 +395,98 @@ export default function AdminClient() {
     }
   }
 
+  function abrirApagarResultados(numeroEtapa: number) {
+    setConfirmarApagarResultados({ numeroEtapa, texto: '' })
+  }
+
+  async function apagarResultados() {
+    if (!selectedProva || !confirmarApagarResultados) return
+    setApagandoResultados(true)
+    try {
+      const res = await fetch('/api/admin/resultados', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provaId: selectedProva.id, numeroEtapa: confirmarApagarResultados.numeroEtapa }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro a apagar: ' + json.error)
+        return
+      }
+      setConfirmarApagarResultados(null)
+      carregar()
+    } finally {
+      setApagandoResultados(false)
+    }
+  }
+
+  async function abrirApostasPanel() {
+    if (!selectedProva) return
+    setApostasPanelAberto(true)
+    setApostasLoading(true)
+    setEditingJogadorId(null)
+    setApostaForm(null)
+    try {
+      const res = await fetch(`/api/admin/apostas?provaId=${selectedProva.id}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Erro ao carregar apostas')
+      setApostasJogadores(json.jogadores)
+    } catch (e) {
+      alert('Erro a carregar apostas: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
+      setApostasJogadores([])
+    } finally {
+      setApostasLoading(false)
+    }
+  }
+
+  function abrirEditarAposta(j: JogadorAposta) {
+    setEditingJogadorId(j.user_id)
+    const top20 = [...(j.apostas_top20 ?? [])]
+    while (top20.length < 20) top20.push('')
+    setApostaForm({
+      top20,
+      sprint: j.camisola_sprint ?? '',
+      montanha: j.camisola_montanha ?? '',
+      juventude: j.camisola_juventude ?? '',
+    })
+  }
+
+  function atualizarApostaTop20(index: number, valor: string) {
+    if (!apostaForm) return
+    const top20 = [...apostaForm.top20]
+    top20[index] = valor
+    setApostaForm({ ...apostaForm, top20 })
+  }
+
+  async function guardarAposta() {
+    if (!selectedProva || !editingJogadorId || !apostaForm) return
+    setSavingAposta(true)
+    try {
+      const res = await fetch('/api/admin/apostas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provaId: selectedProva.id,
+          userId: editingJogadorId,
+          apostasTop20: apostaForm.top20,
+          camisolaSprint: apostaForm.sprint,
+          camisolaMontanha: apostaForm.montanha,
+          camisolaJuventude: apostaForm.juventude,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert('Erro a guardar: ' + json.error)
+        return
+      }
+      setEditingJogadorId(null)
+      setApostaForm(null)
+      await abrirApostasPanel()
+    } finally {
+      setSavingAposta(false)
+    }
+  }
+
   function atualizarEtapaForm(index: number, campo: keyof EtapaPlaneada, valor: string) {
     if (!editingProva) return
     const etapas = [...editingProva.etapas]
@@ -586,9 +699,14 @@ export default function AdminClient() {
             </div>
           ) : (
             <div>
-              <button className="btn-secondary" style={{ marginBottom: 16, fontSize: 12, padding: '8px 12px' }} onClick={() => setSelectedProvaId(null)}>
-                ← Voltar
-              </button>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={() => setSelectedProvaId(null)}>
+                  ← Voltar
+                </button>
+                <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={abrirApostasPanel}>
+                  Ver/Editar Apostas dos Jogadores
+                </button>
+              </div>
               <div className="display-lg" style={{ marginBottom: 24 }}>{selectedProva.nome}</div>
 
               {/* Startlist */}
@@ -797,6 +915,15 @@ export default function AdminClient() {
                             <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={() => abrirResultados(numero)}>
                               Editar Resultados
                             </button>
+                            {resultado && (
+                              <button
+                                className="btn-secondary"
+                                style={{ fontSize: 12, padding: '8px 12px', color: 'var(--red)', borderColor: 'var(--red)' }}
+                                onClick={() => abrirApagarResultados(numero)}
+                              >
+                                Apagar Resultados
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1152,6 +1279,175 @@ export default function AdminClient() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal apagar resultados — dupla validação: só abre depois de clicar
+          no botão "Apagar Resultados" e só fica ativo depois de escrever a
+          frase exata desta etapa. */}
+      {confirmarApagarResultados && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => !apagandoResultados && setConfirmarApagarResultados(null)}
+        >
+          <div className="card" style={{ maxWidth: 460, width: '100%', padding: 28 }} onClick={e => e.stopPropagation()}>
+            <div className="display-lg" style={{ marginBottom: 12, fontSize: 18, color: 'var(--red)' }}>Apagar Resultados</div>
+            <div style={{ fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
+              Vais apagar TODOS os resultados guardados da Etapa {confirmarApagarResultados.numeroEtapa} (Classificação
+              Geral, Sprint, Montanha e Juventude). A etapa volta a ficar &quot;Pendente&quot; — isto não tem volta a
+              dar, só reaparece se voltares a importar ou colar os resultados.
+            </div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              Escreve <span className="mono">APAGAR ETAPA {confirmarApagarResultados.numeroEtapa}</span> para confirmar:
+            </label>
+            <input
+              autoFocus
+              value={confirmarApagarResultados.texto}
+              onChange={e => setConfirmarApagarResultados({ ...confirmarApagarResultados, texto: e.target.value })}
+              placeholder={`APAGAR ETAPA ${confirmarApagarResultados.numeroEtapa}`}
+              style={{ width: '100%', padding: 10, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, marginBottom: 20, boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                className="btn-primary"
+                style={{ flex: 1, background: 'var(--red)', color: '#fff' }}
+                disabled={apagandoResultados || confirmarApagarResultados.texto.trim() !== `APAGAR ETAPA ${confirmarApagarResultados.numeroEtapa}`}
+                onClick={apagarResultados}
+              >
+                {apagandoResultados ? 'A apagar…' : 'Apagar definitivamente'}
+              </button>
+              <button className="btn-secondary" style={{ flex: 1 }} disabled={apagandoResultados} onClick={() => setConfirmarApagarResultados(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Painel lateral — consultar/editar a aposta de cada jogador nesta prova */}
+      {apostasPanelAberto && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1100 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={() => setApostasPanelAberto(false)} />
+          <div
+            style={{
+              position: 'absolute', top: 0, right: 0, height: '100%', width: 'min(480px, 100%)',
+              background: 'var(--surface)', boxShadow: '-8px 0 24px rgba(0,0,0,0.12)', overflowY: 'auto', padding: 24,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div className="display-lg" style={{ fontSize: 18 }}>Apostas — {selectedProva?.nome}</div>
+              <button onClick={() => setApostasPanelAberto(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-dim)' }}>
+                ×
+              </button>
+            </div>
+
+            {apostasLoading ? (
+              <div style={{ color: 'var(--text-dim)' }}>A carregar…</div>
+            ) : editingJogadorId && apostaForm ? (
+              (() => {
+                const jogador = apostasJogadores.find(j => j.user_id === editingJogadorId)
+                return (
+                  <div>
+                    <button
+                      className="btn-secondary"
+                      style={{ fontSize: 12, padding: '6px 10px', marginBottom: 16 }}
+                      onClick={() => { setEditingJogadorId(null); setApostaForm(null) }}
+                    >
+                      ← Voltar à lista
+                    </button>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>{jogador?.full_name || jogador?.username}</div>
+
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Top 20
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+                      {apostaForm.top20.map((nome, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span className="mono" style={{ fontSize: 12, color: 'var(--text-dim)', width: 20, flexShrink: 0 }}>{idx + 1}</span>
+                          <input
+                            value={nome}
+                            onChange={e => atualizarApostaTop20(idx, e.target.value)}
+                            style={{ flex: 1, minWidth: 0, padding: 8, border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Camisolas
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+                      {(
+                        [
+                          ['sprint', 'Sprint'],
+                          ['montanha', 'Montanha'],
+                          ['juventude', 'Juventude'],
+                        ] as const
+                      ).map(([campo, label]) => (
+                        <div key={campo}>
+                          <label className="mono" style={{ display: 'block', fontSize: 10, color: 'var(--text-dim)', marginBottom: 3 }}>{label}</label>
+                          <input
+                            value={apostaForm[campo]}
+                            onChange={e => setApostaForm({ ...apostaForm, [campo]: e.target.value })}
+                            style={{ width: '100%', padding: 8, border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <button className="btn-primary" style={{ flex: 1 }} onClick={guardarAposta} disabled={savingAposta}>
+                        {savingAposta ? 'A guardar…' : 'Guardar'}
+                      </button>
+                      <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setEditingJogadorId(null); setApostaForm(null) }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {apostasJogadores.map(j => {
+                  const completa =
+                    (j.apostas_top20 ?? []).filter(n => n && n.trim()).length === 20 &&
+                    !!j.camisola_sprint?.trim() && !!j.camisola_montanha?.trim() && !!j.camisola_juventude?.trim()
+                  return (
+                    <div
+                      key={j.user_id}
+                      className="card"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, cursor: 'pointer' }}
+                      onClick={() => abrirEditarAposta(j)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--surface-3)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
+                          {j.avatar_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={j.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{j.full_name || j.username}</div>
+                          <div className="mono" style={{ fontSize: 11, color: 'var(--text-dim)' }}>@{j.username}</div>
+                        </div>
+                      </div>
+                      <span
+                        className="mono"
+                        style={{
+                          fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999, flexShrink: 0,
+                          background: completa ? 'rgba(22,163,74,0.14)' : 'rgba(107,114,128,0.14)',
+                          color: completa ? '#146633' : '#4B5563',
+                        }}
+                      >
+                        {completa ? 'Completa' : 'Incompleta'}
+                      </span>
+                    </div>
+                  )
+                })}
+                {apostasJogadores.length === 0 && <div style={{ color: 'var(--text-dim)' }}>Nenhum jogador encontrado.</div>}
+              </div>
+            )}
           </div>
         </div>
       )}
