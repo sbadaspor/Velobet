@@ -41,6 +41,41 @@ function diasAte(iso: string) {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+function pluralizar(n: number, singular: string, plural: string) {
+  return `${n} ${n === 1 ? singular : plural}`
+}
+
+/** "Faltam 2 dias, 5 horas, 34 minutos e 12 segundos" — a partir de uma
+ * diferença de tempo em milissegundos (já garantida > 0 por quem chama). */
+function formatarContagem(diffMs: number) {
+  const totalSegundos = Math.floor(diffMs / 1000)
+  const dias = Math.floor(totalSegundos / 86400)
+  const horas = Math.floor((totalSegundos % 86400) / 3600)
+  const minutos = Math.floor((totalSegundos % 3600) / 60)
+  const segundos = totalSegundos % 60
+  return `Faltam ${pluralizar(dias, 'dia', 'dias')}, ${pluralizar(horas, 'hora', 'horas')}, ${pluralizar(minutos, 'minuto', 'minutos')} e ${pluralizar(segundos, 'segundo', 'segundos')}`
+}
+
+/** Texto por baixo do "Olá, ...": se a etapa tiver hora de início definida
+ * e essa hora ainda não tiver passado, mostra uma contagem em tempo real
+ * (dias/horas/minutos/segundos) até esse instante exato. Sem hora de
+ * início (ou já passada), mantém o texto por dias como já existia. */
+function subtituloEtapa(proximaEtapa: ProximaEtapa | null, now: Date): string {
+  if (!proximaEtapa) return 'Sem etapas agendadas'
+
+  if (proximaEtapa.horaInicio) {
+    const inicio = new Date(`${proximaEtapa.dataEtapa}T${proximaEtapa.horaInicio}`)
+    const diffMs = inicio.getTime() - now.getTime()
+    if (!Number.isNaN(inicio.getTime()) && diffMs > 0) {
+      return formatarContagem(diffMs)
+    }
+  }
+
+  return proximaEtapa.daysLeft <= 0
+    ? 'A etapa é hoje'
+    : `Faltam ${proximaEtapa.daysLeft} dia${proximaEtapa.daysLeft === 1 ? '' : 's'} para a próxima etapa`
+}
+
 function badgeClass(status: string) {
   if (status === 'A decorrer') return 'badge-a-decorrer'
   if (status === 'Finalizada') return 'badge-finalizada'
@@ -97,6 +132,7 @@ type EtapaRow = {
   local_partida: string | null
   local_chegada: string | null
   data_etapa: string
+  hora_inicio: string | null
   rota_pontos: RoutePoint[] | null
 }
 
@@ -109,6 +145,8 @@ type ProximaEtapa = {
   elevacao: number | null
   status: 'Brevemente' | 'A decorrer'
   daysLeft: number
+  dataEtapa: string
+  horaInicio: string | null
   rotaPontos: RoutePoint[] | null
 }
 
@@ -165,7 +203,7 @@ export default function HojePage() {
       if (provasList.length > 0) {
         const { data: etapasData } = await supabase
           .from('etapas_planeadas')
-          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, rota_pontos')
+          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, hora_inicio, rota_pontos')
           .in('prova_id', provasList.map(p => p.id))
           .order('data_etapa', { ascending: true })
 
@@ -197,6 +235,8 @@ export default function HojePage() {
       elevacao: candidata.elevacao_m,
       status: isHoje || prova?.status === 'fechada' ? 'A decorrer' : 'Brevemente',
       daysLeft: diasAte(candidata.data_etapa),
+      dataEtapa: candidata.data_etapa,
+      horaInicio: candidata.hora_inicio,
       rotaPontos: candidata.rota_pontos,
     }
   }, [etapas, provas])
@@ -280,11 +320,7 @@ export default function HojePage() {
         <div className="eyebrow mb-3">{diaSemana}, {dataStr} · {hora}</div>
         <div className="display-2xl mb-2">Olá, {userName || '...'}.</div>
         <div className="text-sm text-text-dim mb-6">
-          {proximaEtapa
-            ? proximaEtapa.daysLeft <= 0
-              ? 'A etapa é hoje'
-              : `Faltam ${proximaEtapa.daysLeft} dia${proximaEtapa.daysLeft === 1 ? '' : 's'} para a próxima etapa`
-            : 'Sem etapas agendadas'}
+          {subtituloEtapa(proximaEtapa, now)}
         </div>
 
         {/* Card hero */}
