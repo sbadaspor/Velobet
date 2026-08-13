@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/adminAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { parseClassificacao, liderDaClassificacao } from '@/lib/pcsParser'
+import { notificarResultadosImportados } from '@/lib/notificacoesGatilhos'
 
 export async function POST(req: Request) {
   const admin = await requireAdmin()
@@ -29,6 +30,16 @@ export async function POST(req: Request) {
     prova_id: provaId,
     numero_etapa: Number(numeroEtapa),
   }
+
+  // Guarda o estado anterior desta etapa — para só notificar os jogadores
+  // se isto for a PRIMEIRA vez que fica com sucesso (uma correção/re-colagem
+  // não deve voltar a notificar toda a gente).
+  const { data: etapaAnterior } = await supabase
+    .from('etapas_resultados')
+    .select('import_status')
+    .eq('prova_id', provaId)
+    .eq('numero_etapa', Number(numeroEtapa))
+    .maybeSingle()
 
   try {
     if (classificacao?.trim()) {
@@ -89,6 +100,14 @@ export async function POST(req: Request) {
       )
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const { data: prova } = await supabase.from('provas').select('nome').eq('id', provaId).maybeSingle()
+  await notificarResultadosImportados(
+    supabase,
+    prova?.nome ?? 'uma prova',
+    Number(numeroEtapa),
+    etapaAnterior?.import_status
+  )
 
   return NextResponse.json({ ok: true })
 }
