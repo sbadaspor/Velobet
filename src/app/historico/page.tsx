@@ -2,26 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calcularPontos, compararDesempate, type CategoriaProvaTipo } from '@/lib/pontuacao'
 
 // Paleta fixa para as linhas do gráfico "Corrida pelo topo" — mesma
 // ordem que a usada na Classificação (Chart — Evolução).
 const CHART_COLORS = ['#E0A916', '#211D15', '#146633', '#B5651D', '#1E40AF', '#6E7480']
-
-// `apostas_historicas` é uma tabela legada (sem user_id, só username em texto)
-// e nunca é atualizada quando alguém muda de username em `perfis`. Para não
-// perder o cruzamento com o avatar/nome atual, normalizamos para minúsculas
-// (resolve diferenças de maiúsculas/minúsculas) e mapeamos aqui os usernames
-// antigos conhecidos que já mudaram — confirmado: Rafael tinha "Rafiking57"
-// e passou a "rafinhasaldanha4".
-const USERNAMES_ANTIGOS: Record<string, string> = {
-  rafiking57: 'rafinhasaldanha4',
-}
-function normalizarUsername(username: string) {
-  const lower = username.toLowerCase()
-  return USERNAMES_ANTIGOS[lower] ?? lower
-}
 
 // ── Ícones (mesmo estilo outline das outras páginas) ──
 const HomeIcon = () => (
@@ -43,10 +30,18 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 10.26 23.77 10.26 17.39 15.04 20.49 23.31 12 18.54 3.51 23.31 6.61 15.04 0.23 10.26 8.91 10.26 12 2" />
   </svg>
 )
+const UserIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+)
+
 const TABS: { label: string; icon: () => React.ReactElement; href: string }[] = [
   { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
   { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
+  { label: 'Eu', icon: UserIcon, href: '/perfil' },
 ]
 
 function medalClass(pos: number) {
@@ -201,6 +196,7 @@ const CHART_H = 160
 const CHART_PAD = 16
 
 export default function HistoricoPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [editions, setEditions] = useState<Edition[]>([])
   const [selectedRace, setSelectedRace] = useState<RaceKey>('tour')
@@ -228,12 +224,12 @@ export default function HistoricoPage() {
       const [{ data: histData }, { data: provasData }, { data: perfisData }] = await Promise.all([
         supabase.from('apostas_historicas').select('*'),
         supabase.from('provas').select('id, nome, categoria, status').eq('status', 'finalizada'),
-        supabase.from('perfis').select('username, avatar_url'),
+        supabase.from('perfis_publicos').select('username, avatar_url'),
       ])
 
       const avatarByUsername: Record<string, string | null> = {}
       ;((perfisData ?? []) as { username: string; avatar_url: string | null }[]).forEach(p => {
-        avatarByUsername[normalizarUsername(p.username)] = p.avatar_url
+        avatarByUsername[p.username] = p.avatar_url
       })
       setAvatarMap(avatarByUsername)
 
@@ -394,12 +390,18 @@ export default function HistoricoPage() {
   const series = rivalidade?.series ?? []
   const maxWins = rivalidade?.maxWins ?? 1
 
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+  }
+
   if (loading) return null
 
   return (
     <div className="min-h-screen bg-bg">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-bg">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
         <div className="flex-1 flex items-center relative">
           <button className="text-xl text-text" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           {menuOpen && (
@@ -412,13 +414,21 @@ export default function HistoricoPage() {
                 <Link href="/regras" className="block px-4 py-2.5 text-sm font-medium text-text hover:bg-surface-2" onClick={() => setMenuOpen(false)}>
                   Regras & Pontuação
                 </Link>
+                <div className="border-t border-border my-1.5" />
+                <button
+                  className="block w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-surface-2"
+                  style={{ color: 'var(--red)' }}
+                  onClick={handleLogout}
+                >
+                  Terminar sessão
+                </button>
               </div>
             </>
           )}
         </div>
         <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
           <span className="w-3 h-3 rounded-full bg-gold" />
-          <span>Velo Bet</span>
+          <span>Tour · 2026</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
           <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden cursor-pointer">
@@ -461,9 +471,9 @@ export default function HistoricoPage() {
                   >
                     <div className="h-1 w-full mb-3 rounded-sm" style={{ background: rider.color }} />
                     <div className="w-12 h-12 rounded-full bg-surface-3 border-2 border-border mb-2 overflow-hidden">
-                      {avatarMap[normalizarUsername(rider.username)] && (
+                      {avatarMap[rider.username] && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={avatarMap[normalizarUsername(rider.username)]!} alt="" className="w-full h-full object-cover" />
+                        <img src={avatarMap[rider.username]!} alt="" className="w-full h-full object-cover" />
                       )}
                     </div>
                     <div className="text-sm font-semibold mb-1.5 px-1 w-full truncate">{rider.name}</div>
@@ -613,12 +623,6 @@ export default function HistoricoPage() {
                       >
                         <div className="flex items-center gap-3">
                           <div className={`mono font-extrabold text-sm min-w-[20px] ${medalClass(i + 1)}`}>{i + 1}</div>
-                          <div className="w-8 h-8 rounded-full bg-surface-3 border border-border overflow-hidden flex-shrink-0">
-                            {avatarMap[normalizarUsername(entry.username)] && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={avatarMap[normalizarUsername(entry.username)]!} alt="" className="w-full h-full object-cover" />
-                            )}
-                          </div>
                           <div className="flex-1 font-semibold text-sm truncate">{entry.name}</div>
                           <div className="mono font-bold text-sm text-text-dim">{entry.points} pts</div>
                           <div
@@ -715,7 +719,7 @@ export default function HistoricoPage() {
       </div>
 
       {/* Bottom tab bar */}
-      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-bg">
+      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
         {TABS.map(tab => (
           <Link key={tab.label} href={tab.href} className="flex-1 cursor-pointer">
             <div className="flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold uppercase tracking-wide bottom-nav-item">
