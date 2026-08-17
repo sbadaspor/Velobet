@@ -13,9 +13,6 @@ const MESES = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
 
-// Vazio até a etapa finalizar e existirem resultados reais.
-const classificacaoTop20: { posicao: number; nome: string; tempo: string }[] = []
-
 function formatarData(date: Date) {
   return {
     diaSemana: DIAS[date.getDay()],
@@ -112,8 +109,25 @@ type EtapaRow = {
   rota_pontos: RoutePoint[] | null
 }
 
+type LinhaClassificacao = {
+  posicao: number
+  nome: string
+  equipa?: string
+  tempo: string
+}
+
+type ResultadoRow = {
+  id: string
+  prova_id: string
+  numero_etapa: number
+  classificacao_geral_top20: string[] | null
+  classificacao_geral_completa: LinhaClassificacao[] | null
+  tempos_classificacao: Record<string, string> | null
+}
+
 type ProximaEtapa = {
   numero: number
+  provaId: string
   titulo: string
   perfil: string | null
   distancia: number | null
@@ -133,6 +147,7 @@ export default function HojePage() {
   const [dadosCarregados, setDadosCarregados] = useState(false)
   const [provas, setProvas] = useState<ProvaRow[]>([])
   const [etapas, setEtapas] = useState<EtapaRow[]>([])
+  const [resultados, setResultados] = useState<ResultadoRow[]>([])
 
   useEffect(() => {
     setNow(new Date())
@@ -172,13 +187,20 @@ export default function HojePage() {
       setProvas(provasList)
 
       if (provasList.length > 0) {
-        const { data: etapasData } = await supabase
-          .from('etapas_planeadas')
-          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, rota_pontos')
-          .in('prova_id', provasList.map(p => p.id))
-          .order('data_etapa', { ascending: true })
+        const [{ data: etapasData }, { data: resultadosData }] = await Promise.all([
+          supabase
+            .from('etapas_planeadas')
+            .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, rota_pontos')
+            .in('prova_id', provasList.map(p => p.id))
+            .order('data_etapa', { ascending: true }),
+          supabase
+            .from('etapas_resultados')
+            .select('id, prova_id, numero_etapa, classificacao_geral_top20, classificacao_geral_completa, tempos_classificacao')
+            .in('prova_id', provasList.map(p => p.id)),
+        ])
 
         setEtapas((etapasData ?? []) as EtapaRow[])
+        setResultados((resultadosData ?? []) as ResultadoRow[])
       }
 
       setDadosCarregados(true)
@@ -199,6 +221,7 @@ export default function HojePage() {
 
     return {
       numero: candidata.numero_etapa,
+      provaId: candidata.prova_id,
       titulo: candidata.local_chegada || `Etapa ${candidata.numero_etapa}`,
       perfil: candidata.perfil,
       distancia: candidata.distancia_km,
@@ -208,6 +231,31 @@ export default function HojePage() {
       rotaPontos: candidata.rota_pontos,
     }
   }, [etapas, provas])
+
+  // Classificação a mostrar: a etapa mais recente com resultados já
+  // guardados na mesma prova da "próxima etapa" (pode ser uma etapa
+  // anterior à que está em destaque, se essa ainda não tiver resultados).
+  const classificacaoAtual = useMemo<{ numero: number; linhas: LinhaClassificacao[] } | null>(() => {
+    if (!proximaEtapa) return null
+    const daProva = resultados
+      .filter(r => r.prova_id === proximaEtapa.provaId)
+      .filter(r => (r.classificacao_geral_completa && r.classificacao_geral_completa.length > 0) || (r.classificacao_geral_top20 && r.classificacao_geral_top20.length > 0))
+      .sort((a, b) => b.numero_etapa - a.numero_etapa)
+
+    const ultima = daProva[0]
+    if (!ultima) return null
+
+    const linhas =
+      ultima.classificacao_geral_completa && ultima.classificacao_geral_completa.length > 0
+        ? [...ultima.classificacao_geral_completa].sort((a, b) => a.posicao - b.posicao)
+        : (ultima.classificacao_geral_top20 ?? []).map((nome, i) => ({
+            posicao: i + 1,
+            nome,
+            tempo: ultima.tempos_classificacao?.[nome] ?? '',
+          }))
+
+    return { numero: ultima.numero_etapa, linhas }
+  }, [resultados, proximaEtapa])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -326,15 +374,15 @@ export default function HojePage() {
         )}
 
         <div className="text-sm font-semibold text-text-dim mt-8 mb-4">
-          Classificação Top 20 — Geral da etapa
+          {classificacaoAtual ? `Classificação Geral da etapa ${classificacaoAtual.numero}` : 'Classificação Geral'}
         </div>
 
-        {classificacaoTop20.length === 0 ? (
+        {!classificacaoAtual || classificacaoAtual.linhas.length === 0 ? (
           <div className="table-wrapper text-center py-10 px-5">
             <div className="text-text-sub text-sm">Ainda sem resultados</div>
           </div>
         ) : (
-          <div className="table-wrapper">
+          <div className="table-wrapper" style={{ maxHeight: 340, overflowY: 'auto' }}>
             <table>
               <thead>
                 <tr>
@@ -344,11 +392,11 @@ export default function HojePage() {
                 </tr>
               </thead>
               <tbody>
-                {classificacaoTop20.map(row => (
+                {classificacaoAtual.linhas.map(row => (
                   <tr key={row.posicao}>
                     <td className={`mono font-extrabold ${medalClass(row.posicao)}`}>{row.posicao}</td>
                     <td className="font-semibold">{row.nome}</td>
-                    <td className="mono font-semibold">{row.tempo}</td>
+                    <td className="mono font-semibold">{row.tempo || '—'}</td>
                   </tr>
                 ))}
               </tbody>
