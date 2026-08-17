@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calcularPontos, compararDesempate, getConfigCategoria, type CategoriaProvaTipo } from '@/lib/pontuacao'
 import JerseyBadge from '@/components/JerseyBadge'
@@ -27,18 +26,10 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 10.26 23.77 10.26 17.39 15.04 20.49 23.31 12 18.54 3.51 23.31 6.61 15.04 0.23 10.26 8.91 10.26 12 2" />
   </svg>
 )
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-)
-
 const TABS: { label: string; icon: () => React.ReactElement; href: string | null }[] = [
   { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
   { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
-  { label: 'Eu', icon: UserIcon, href: '/perfil' },
 ]
 
 function medalClass(pos: number) {
@@ -101,7 +92,6 @@ type CompData = {
 }
 
 export default function ClassificacaoPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [comps, setComps] = useState<CompData[]>([])
   const [stageIdx, setStageIdx] = useState<Record<string, number>>({})
@@ -230,18 +220,12 @@ export default function ClassificacaoPage() {
     })()
   }, [])
 
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/auth/login')
-  }
-
   if (loading) return null
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-bg">
         <div className="flex-1 flex items-center relative">
           <button className="text-xl text-text" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           {menuOpen && (
@@ -254,21 +238,13 @@ export default function ClassificacaoPage() {
                 <Link href="/regras" className="block px-4 py-2.5 text-sm font-medium text-text hover:bg-surface-2" onClick={() => setMenuOpen(false)}>
                   Regras & Pontuação
                 </Link>
-                <div className="border-t border-border my-1.5" />
-                <button
-                  className="block w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-surface-2"
-                  style={{ color: 'var(--red)' }}
-                  onClick={handleLogout}
-                >
-                  Terminar sessão
-                </button>
               </div>
             </>
           )}
         </div>
         <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
           <span className="w-3 h-3 rounded-full bg-gold" />
-          <span>Tour · 2026</span>
+          <span>Velo Bet</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
           <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden">
@@ -429,7 +405,7 @@ export default function ClassificacaoPage() {
       </div>
 
       {/* Bottom tab bar */}
-      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
+      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-bg">
         {TABS.map(tab => {
           const active = tab.label === 'Classificação'
           const content = (
