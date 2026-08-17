@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { RoutePoint } from '@/components/RouteMap'
 
@@ -29,12 +29,6 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 10.26 23.77 10.26 17.39 15.04 20.49 23.31 12 18.54 3.51 23.31 6.61 15.04 0.23 10.26 8.91 10.26 12 2" />
   </svg>
 )
-const UserIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-)
 const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
   <svg
     viewBox="0 0 24 24"
@@ -54,7 +48,6 @@ const TABS: { label: string; icon: () => React.ReactElement; href: string | null
   { label: 'Hoje', icon: HomeIcon, href: '/hoje' },
   { label: 'Próximas', icon: CalendarIcon, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, href: '/classificacao' },
-  { label: 'Eu', icon: UserIcon, href: '/perfil' },
 ]
 
 type ProvaRow = {
@@ -112,6 +105,7 @@ export default function ProximasPage() {
   const [loading, setLoading] = useState(true)
   const [provas, setProvas] = useState<ProvaRow[]>([])
   const [etapasPorProva, setEtapasPorProva] = useState<Record<string, EtapaPlaneada[]>>({})
+  const [provasComStartlist, setProvasComStartlist] = useState<Set<string>>(new Set())
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({})
   const [menuOpen, setMenuOpen] = useState(false)
@@ -155,6 +149,14 @@ export default function ProximasPage() {
           grouped[etapa.prova_id].push(etapa)
         })
         setEtapasPorProva(grouped)
+
+        // "Apostar" só deve poder ser clicado se já houver startlist carregada.
+        const { data: ciclistasData } = await supabase
+          .from('ciclistas_prova')
+          .select('prova_id')
+          .in('prova_id', provasList.map(p => p.id))
+
+        setProvasComStartlist(new Set((ciclistasData ?? []).map((c: { prova_id: string }) => c.prova_id)))
       }
 
       setLoading(false)
@@ -173,26 +175,20 @@ export default function ProximasPage() {
         daysLeft,
         isOngoing,
         urgent: daysLeft > 0 && daysLeft <= 7,
-        disabled: prova.status !== 'aberta',
+        disabled: prova.status !== 'aberta' || !provasComStartlist.has(prova.id),
         stagesDetails: etapasPorProva[prova.id] ?? [],
       }
     })
 
     return lista.sort((a, b) => (a.isOngoing ? -1 : a.daysLeft) - (b.isOngoing ? -1 : b.daysLeft))
-  }, [provas, etapasPorProva])
-
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/auth/login')
-  }
+  }, [provas, etapasPorProva, provasComStartlist])
 
   if (loading) return null
 
   return (
     <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-bg">
         <div className="flex-1 flex items-center relative">
           <button className="text-xl text-text" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           {menuOpen && (
@@ -205,21 +201,13 @@ export default function ProximasPage() {
                 <Link href="/regras" className="block px-4 py-2.5 text-sm font-medium text-text hover:bg-surface-2" onClick={() => setMenuOpen(false)}>
                   Regras & Pontuação
                 </Link>
-                <div className="border-t border-border my-1.5" />
-                <button
-                  className="block w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-surface-2"
-                  style={{ color: 'var(--red)' }}
-                  onClick={handleLogout}
-                >
-                  Terminar sessão
-                </button>
               </div>
             </>
           )}
         </div>
         <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
           <span className="w-3 h-3 rounded-full bg-gold" />
-          <span>Tour · 2026</span>
+          <span>Velo Bet</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
           <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden">
@@ -276,7 +264,7 @@ export default function ProximasPage() {
                         <button
                           className="btn-primary text-xs px-3.5 py-2"
                           disabled={comp.disabled}
-                          onClick={e => e.stopPropagation()}
+                          onClick={e => { e.stopPropagation(); router.push(`/apostar/${comp.id}`) }}
                         >
                           Apostar
                         </button>
@@ -363,7 +351,7 @@ export default function ProximasPage() {
       </div>
 
       {/* Bottom tab bar */}
-      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
+      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-bg">
         {TABS.map(tab => {
           const active = tab.label === 'Próximas'
           const content = (
