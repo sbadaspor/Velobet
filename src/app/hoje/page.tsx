@@ -2,15 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { RoutePoint } from '@/components/RouteMap'
-import InteractiveElevationProfile from '@/components/InteractiveElevationProfile'
+import ElevationProfile from '@/components/ElevationProfile'
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
+
+// Vazio até a etapa finalizar e existirem resultados reais.
+const classificacaoTop20: { posicao: number; nome: string; tempo: string }[] = []
 
 function formatarData(date: Date) {
   return {
@@ -39,41 +43,6 @@ function diasAte(iso: string) {
   const target = parseISODate(iso)
   target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-function pluralizar(n: number, singular: string, plural: string) {
-  return `${n} ${n === 1 ? singular : plural}`
-}
-
-/** "Faltam 2 dias, 5 horas, 34 minutos e 12 segundos" — a partir de uma
- * diferença de tempo em milissegundos (já garantida > 0 por quem chama). */
-function formatarContagem(diffMs: number) {
-  const totalSegundos = Math.floor(diffMs / 1000)
-  const dias = Math.floor(totalSegundos / 86400)
-  const horas = Math.floor((totalSegundos % 86400) / 3600)
-  const minutos = Math.floor((totalSegundos % 3600) / 60)
-  const segundos = totalSegundos % 60
-  return `Faltam ${pluralizar(dias, 'dia', 'dias')}, ${pluralizar(horas, 'hora', 'horas')}, ${pluralizar(minutos, 'minuto', 'minutos')} e ${pluralizar(segundos, 'segundo', 'segundos')}`
-}
-
-/** Texto por baixo do "Olá, ...": se a etapa tiver hora de início definida
- * e essa hora ainda não tiver passado, mostra uma contagem em tempo real
- * (dias/horas/minutos/segundos) até esse instante exato. Sem hora de
- * início (ou já passada), mantém o texto por dias como já existia. */
-function subtituloEtapa(proximaEtapa: ProximaEtapa | null, now: Date): string {
-  if (!proximaEtapa) return 'Sem etapas agendadas'
-
-  if (proximaEtapa.horaInicio) {
-    const inicio = new Date(`${proximaEtapa.dataEtapa}T${proximaEtapa.horaInicio}`)
-    const diffMs = inicio.getTime() - now.getTime()
-    if (!Number.isNaN(inicio.getTime()) && diffMs > 0) {
-      return formatarContagem(diffMs)
-    }
-  }
-
-  return proximaEtapa.daysLeft <= 0
-    ? 'A etapa é hoje'
-    : `Faltam ${proximaEtapa.daysLeft} dia${proximaEtapa.daysLeft === 1 ? '' : 's'} para a próxima etapa`
 }
 
 function badgeClass(status: string) {
@@ -108,10 +77,18 @@ const StarIcon = () => (
     <polygon points="12 2 15.09 10.26 23.77 10.26 17.39 15.04 20.49 23.31 12 18.54 3.51 23.31 6.61 15.04 0.23 10.26 8.91 10.26 12 2" />
   </svg>
 )
+const UserIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+)
+
 const TABS: { label: string; icon: () => React.ReactElement; active: boolean; href: string | null }[] = [
   { label: 'Hoje', icon: HomeIcon, active: true, href: '/hoje' },
   { label: 'Próximas', icon: CalendarIcon, active: false, href: '/proximas' },
   { label: 'Classificação', icon: StarIcon, active: false, href: '/classificacao' },
+  { label: 'Eu', icon: UserIcon, active: false, href: '/perfil' },
 ]
 
 type ProvaRow = {
@@ -132,27 +109,22 @@ type EtapaRow = {
   local_partida: string | null
   local_chegada: string | null
   data_etapa: string
-  hora_inicio: string | null
   rota_pontos: RoutePoint[] | null
 }
 
 type ProximaEtapa = {
   numero: number
-  provaId: string
   titulo: string
   perfil: string | null
   distancia: number | null
   elevacao: number | null
   status: 'Brevemente' | 'A decorrer'
   daysLeft: number
-  dataEtapa: string
-  horaInicio: string | null
   rotaPontos: RoutePoint[] | null
 }
 
-type LinhaTop20 = { posicao: number; nome: string; tempo: string }
-
 export default function HojePage() {
+  const router = useRouter()
   const [now, setNow] = useState<Date | null>(null)
   const [userName, setUserName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -161,7 +133,6 @@ export default function HojePage() {
   const [dadosCarregados, setDadosCarregados] = useState(false)
   const [provas, setProvas] = useState<ProvaRow[]>([])
   const [etapas, setEtapas] = useState<EtapaRow[]>([])
-  const [classificacaoTop20, setClassificacaoTop20] = useState<LinhaTop20[]>([])
 
   useEffect(() => {
     setNow(new Date())
@@ -203,7 +174,7 @@ export default function HojePage() {
       if (provasList.length > 0) {
         const { data: etapasData } = await supabase
           .from('etapas_planeadas')
-          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, hora_inicio, rota_pontos')
+          .select('id, prova_id, numero_etapa, perfil, distancia_km, elevacao_m, local_partida, local_chegada, data_etapa, rota_pontos')
           .in('prova_id', provasList.map(p => p.id))
           .order('data_etapa', { ascending: true })
 
@@ -228,53 +199,21 @@ export default function HojePage() {
 
     return {
       numero: candidata.numero_etapa,
-      provaId: candidata.prova_id,
       titulo: candidata.local_chegada || `Etapa ${candidata.numero_etapa}`,
       perfil: candidata.perfil,
       distancia: candidata.distancia_km,
       elevacao: candidata.elevacao_m,
       status: isHoje || prova?.status === 'fechada' ? 'A decorrer' : 'Brevemente',
       daysLeft: diasAte(candidata.data_etapa),
-      dataEtapa: candidata.data_etapa,
-      horaInicio: candidata.hora_inicio,
       rotaPontos: candidata.rota_pontos,
     }
   }, [etapas, provas])
 
-  // Classificação Geral da etapa mostrada em cima (só existe depois de a
-  // etapa ter resultados importados — antes disso fica "Ainda sem resultados").
-  useEffect(() => {
-    if (!proximaEtapa) {
-      setClassificacaoTop20([])
-      return
-    }
-
-    let ativo = true
+  async function handleLogout() {
     const supabase = createClient()
-    ;(async () => {
-      const { data } = await supabase
-        .from('etapas_resultados')
-        .select('classificacao_geral_top20, tempos_classificacao')
-        .eq('prova_id', proximaEtapa.provaId)
-        .eq('numero_etapa', proximaEtapa.numero)
-        .maybeSingle()
-
-      if (!ativo) return
-
-      const nomes = (data?.classificacao_geral_top20 ?? []) as string[]
-      const tempos = (data?.tempos_classificacao ?? {}) as Record<string, string>
-
-      const linhas: LinhaTop20[] = nomes
-        .map((nome, i) => ({ posicao: i + 1, nome, tempo: tempos[nome] ?? '' }))
-        .filter(l => l.nome && l.nome.trim() !== '')
-
-      setClassificacaoTop20(linhas)
-    })()
-
-    return () => {
-      ativo = false
-    }
-  }, [proximaEtapa?.provaId, proximaEtapa?.numero])
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+  }
 
   if (!now || !dadosCarregados) return null
 
@@ -284,7 +223,7 @@ export default function HojePage() {
   return (
     <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-bg">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-surface border-b border-border">
         <div className="flex-1 flex items-center relative">
           <button className="text-xl text-text" aria-label="Menu" onClick={() => setMenuOpen(o => !o)}>☰</button>
           {menuOpen && (
@@ -297,13 +236,21 @@ export default function HojePage() {
                 <Link href="/regras" className="block px-4 py-2.5 text-sm font-medium text-text hover:bg-surface-2" onClick={() => setMenuOpen(false)}>
                   Regras & Pontuação
                 </Link>
+                <div className="border-t border-border my-1.5" />
+                <button
+                  className="block w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-surface-2"
+                  style={{ color: 'var(--red)' }}
+                  onClick={handleLogout}
+                >
+                  Terminar sessão
+                </button>
               </div>
             </>
           )}
         </div>
         <div className="flex-1 flex items-center justify-center gap-2 text-sm font-medium">
           <span className="w-3 h-3 rounded-full bg-gold" />
-          <span>Velo Bet</span>
+          <span>Tour · 2026</span>
         </div>
         <div className="flex-1 flex items-center justify-end">
           <Link href="/perfil" className="block w-10 h-10 rounded-full bg-surface-3 border-2 border-border overflow-hidden cursor-pointer">
@@ -320,7 +267,11 @@ export default function HojePage() {
         <div className="eyebrow mb-3">{diaSemana}, {dataStr} · {hora}</div>
         <div className="display-2xl mb-2">Olá, {userName || '...'}.</div>
         <div className="text-sm text-text-dim mb-6">
-          {subtituloEtapa(proximaEtapa, now)}
+          {proximaEtapa
+            ? proximaEtapa.daysLeft <= 0
+              ? 'A etapa é hoje'
+              : `Faltam ${proximaEtapa.daysLeft} dia${proximaEtapa.daysLeft === 1 ? '' : 's'} para a próxima etapa`
+            : 'Sem etapas agendadas'}
         </div>
 
         {/* Card hero */}
@@ -359,7 +310,7 @@ export default function HojePage() {
             {proximaEtapa.rotaPontos && proximaEtapa.rotaPontos.length >= 2 && (
               <>
                 <div className="divider" />
-                <InteractiveElevationProfile
+                <ElevationProfile
                   pontos={proximaEtapa.rotaPontos}
                   distanciaKm={proximaEtapa.distancia ?? 0}
                   height={90}
@@ -407,7 +358,7 @@ export default function HojePage() {
       </div>
 
       {/* Bottom tab bar */}
-      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-bg">
+      <footer className="sticky bottom-0 z-10 flex justify-around py-3 bg-surface border-t border-border">
         {TABS.map(tab => {
           const content = (
             <div className={`flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold uppercase tracking-wide bottom-nav-item ${tab.active ? 'active' : ''}`}>
