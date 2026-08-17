@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { parseGpxParaPontosRota } from '@/lib/gpxParser'
 
@@ -106,6 +106,19 @@ function rotaPontosTextoValido(texto: string | undefined): boolean {
   }
 }
 
+/** Reconstrói o texto "pos\tnome\tequipa\ttempo" (uma linha por ciclista) a
+ * partir de uma classificação já guardada — para o "Editar Resultados"
+ * reabrir com o que já lá está, em vez de campos em branco. O formato
+ * gerado é exatamente o que `parseClassificacao` sabe voltar a ler. */
+function linhasParaTexto(linhas: LinhaClassificacao[] | null | undefined): string {
+  if (!linhas || linhas.length === 0) return ''
+  return linhas
+    .slice()
+    .sort((a, b) => a.posicao - b.posicao)
+    .map(l => `${l.posicao}\t${l.nome}\t${l.equipa}\t${l.tempo}`)
+    .join('\n')
+}
+
 const emptyEtapa = (): EtapaPlaneada => ({
   numero_etapa: '',
   nome: '',
@@ -166,6 +179,18 @@ export default function AdminClient() {
   const [editingJogadorId, setEditingJogadorId] = useState<string | null>(null)
   const [apostaForm, setApostaForm] = useState<{ top20: string[]; sprint: string; montanha: string; juventude: string } | null>(null)
   const [savingAposta, setSavingAposta] = useState(false)
+
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** Pop-up curto de confirmação (ex. "Prova guardada.") — usado depois de
+   * qualquer Guardar/Apagar com sucesso, para não depender só do modal
+   * fechar sozinho para a pessoa perceber que ficou tudo bem. */
+  function mostrarToast(mensagem: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setToast(mensagem)
+    toastTimerRef.current = setTimeout(() => setToast(null), 2600)
+  }
 
   function alternarEtapaAberta(numero: number) {
     setEtapasAbertas(anterior => {
@@ -266,6 +291,7 @@ export default function AdminClient() {
         setSelectedProvaId(provaId)
         setActiveTab('etapas')
       }
+      mostrarToast('Prova guardada.')
     } catch (e) {
       alert('Erro a guardar: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
     }
@@ -280,6 +306,7 @@ export default function AdminClient() {
       return
     }
     carregar()
+    mostrarToast('Prova apagada.')
   }
 
   function selecionarProva(p: Prova) {
@@ -303,9 +330,9 @@ export default function AdminClient() {
         alert('Erro: ' + json.error)
         return
       }
-      alert(`Startlist processada: ${json.total} ciclistas (${json.dnf} DNF).`)
       setStartlistPaste('')
       carregar()
+      mostrarToast(`Startlist processada: ${json.total} ciclistas (${json.dnf} DNF).`)
     } finally {
       setSavingStartlist(false)
     }
@@ -324,8 +351,8 @@ export default function AdminClient() {
         alert('Erro: ' + json.error)
         return
       }
-      alert(`Startlist processada a partir do PDF: ${json.total} ciclistas (${json.dnf} DNF).`)
       carregar()
+      mostrarToast(`Startlist processada a partir do PDF: ${json.total} ciclistas (${json.dnf} DNF).`)
     } catch (e) {
       alert('Erro a processar o PDF: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
     } finally {
@@ -355,14 +382,21 @@ export default function AdminClient() {
         return
       }
       carregar()
+      mostrarToast('Startlist apagada.')
     } finally {
       setApagandoStartlist(false)
     }
   }
 
   function abrirResultados(numeroEtapa: number) {
+    const resultado = selectedProva?.etapas_resultados.find(r => r.numero_etapa === numeroEtapa) ?? null
     setEditingEtapaNumero(numeroEtapa)
-    setResultsForm({ classificacao: '', sprint: '', montanha: '', juventude: '' })
+    setResultsForm({
+      classificacao: linhasParaTexto(resultado?.classificacao_geral_completa),
+      sprint: linhasParaTexto(resultado?.sprint_completo),
+      montanha: linhasParaTexto(resultado?.montanha_completo),
+      juventude: linhasParaTexto(resultado?.juventude_completo),
+    })
     setShowResultsModal(true)
   }
 
@@ -390,6 +424,7 @@ export default function AdminClient() {
       }
       setShowResultsModal(false)
       carregar()
+      mostrarToast('Resultados guardados.')
     } finally {
       setSavingResults(false)
     }
@@ -415,6 +450,7 @@ export default function AdminClient() {
       }
       setConfirmarApagarResultados(null)
       carregar()
+      mostrarToast('Resultados apagados.')
     } finally {
       setApagandoResultados(false)
     }
@@ -482,6 +518,7 @@ export default function AdminClient() {
       setEditingJogadorId(null)
       setApostaForm(null)
       await abrirApostasPanel()
+      mostrarToast('Aposta guardada.')
     } finally {
       setSavingAposta(false)
     }
@@ -557,6 +594,7 @@ export default function AdminClient() {
       setShowEtapaModal(false)
       setEditingEtapa(null)
       carregar()
+      mostrarToast('Dados da etapa guardados.')
     } catch (e) {
       alert('Erro a guardar: ' + (e instanceof Error ? e.message : 'erro desconhecido'))
     } finally {
@@ -1449,6 +1487,28 @@ export default function AdminClient() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Pop-up de confirmação — "Prova guardada.", "Resultados apagados.", etc. */}
+      {toast && (
+        <div
+          style={{
+            position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 2000,
+            background: 'var(--ink)', color: 'var(--on-ink)', padding: '12px 20px', borderRadius: 'var(--radius-pill)',
+            display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.28)',
+            fontSize: 13, fontWeight: 600, maxWidth: '90vw',
+          }}
+        >
+          <span
+            style={{
+              width: 18, height: 18, borderRadius: '50%', flexShrink: 0, background: 'rgba(22,163,74,0.25)', color: '#4ADE80',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
+            }}
+          >
+            ✓
+          </span>
+          {toast}
         </div>
       )}
     </div>
