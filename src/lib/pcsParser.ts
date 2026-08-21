@@ -144,6 +144,14 @@ export function parseStartlist(texto: string): LinhaStartlist[] {
  * equipa ou de ciclista que quebram para a linha seguinte (por serem
  * compridos) são detetados como "linha de continuação" (não começa
  * por número) e anexados à entrada anterior.
+ *
+ * Cada equipa termina com uma ou mais linhas "DS: Nome1,Nome2" (staff/
+ * diretores desportivos) — não são ciclistas e não entram na startlist.
+ * Essas linhas também podem quebrar para a linha seguinte (ex.: "DS:
+ * BRAMBILLA Gianluca,SANS VEGA" + continuação "Alexandre") tal como os
+ * nomes de equipa/ciclista, por isso é preciso um 3º estado ("staff")
+ * para as continuações desse bloco também serem ignoradas em vez de
+ * ficarem coladas ao nome do último ciclista lido.
  */
 export function parsePdfStartlistTexto(texto: string): LinhaStartlist[] {
   const linhas = texto
@@ -153,16 +161,26 @@ export function parsePdfStartlistTexto(texto: string): LinhaStartlist[] {
 
   const resultado: LinhaStartlist[] = []
   let equipaAtual = ''
-  let ultimoTipo: 'equipa' | 'ciclista' | null = null
+  let ultimoTipo: 'equipa' | 'ciclista' | 'staff' | null = null
   let ultimoNumeroEquipa = 0
 
   const riderRegex = /^(\d+)\.(.+)$/
   const teamRegex = /^(\d{1,3})(\D.+)$/
   const dataRegex = /^\d{1,2}\/\d{1,2}\/\d{4}\b/
   const ignorarRegex = /procyclingstats/i
+  const staffRegex = /^DS\s*:/i
 
   for (const linha of linhas) {
     if (dataRegex.test(linha) || ignorarRegex.test(linha)) continue
+
+    // "DS: Nome1,Nome2" — staff da equipa (diretor desportivo), não é
+    // ciclista. Marca o estado para as linhas de continuação seguintes
+    // (nomes que quebraram) também serem ignoradas, em vez de ficarem
+    // coladas ao nome do último ciclista lido.
+    if (staffRegex.test(linha)) {
+      ultimoTipo = 'staff'
+      continue
+    }
 
     const riderMatch = linha.match(riderRegex)
     if (riderMatch) {
@@ -186,12 +204,15 @@ export function parsePdfStartlistTexto(texto: string): LinhaStartlist[] {
       continue
     }
 
-    // Linha de continuação (nome de equipa ou de ciclista que quebrou para a linha seguinte)
+    // Linha de continuação (nome de equipa, de ciclista, ou de staff DS
+    // que quebrou para a linha seguinte). Staff é ignorado de propósito.
     if (ultimoTipo === 'equipa') {
       equipaAtual = `${equipaAtual} ${linha}`.trim()
     } else if (ultimoTipo === 'ciclista' && resultado.length > 0) {
       resultado[resultado.length - 1].nome = `${resultado[resultado.length - 1].nome} ${linha}`.trim()
     }
+    // ultimoTipo === 'staff' (ou null): ignora a linha, não pertence a
+    // nenhum ciclista/equipa.
   }
 
   return resultado
