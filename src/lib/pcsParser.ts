@@ -44,12 +44,20 @@ export function parseClassificacao(texto: string): LinhaClassificacao[] {
   let ultimoTempo = ''
   let i = 0
 
+  // Uma coluna é "marca de variação" quando começa por seta/igual (▲3, ▼152,
+  // =) — aparece a partir da 2ª etapa. É "número puro" quando é só dígitos
+  // (rank anterior / dorsal). O nome é a 1ª coluna que tem letras e não é
+  // nenhuma destas.
+  const ehMudanca = (s: string) => /^[▲▼△▽▴▾⏶⏷=+\-]/.test(s.trim())
+  const ehNumero = (s: string) => /^\d+$/.test(s.trim())
+  const temLetra = (s: string) => /\p{L}/u.test(s)
+
   while (i < linhas.length) {
     const linha = linhas[i]
     if (/^rnk\b/i.test(linha)) { i++; continue } // cabeçalho da tabela
 
-    const colsLinha = linha.split('\t').map(c => c.trim()).filter(c => c !== '')
-    const primeiraCol = colsLinha[0] ?? ''
+    const cols = linha.split('\t').map(c => c.trim()).filter(c => c !== '')
+    const primeiraCol = cols[0] ?? ''
     const posMatch = primeiraCol.match(/^(\d+)/)
     if (!posMatch) { i++; continue }
     const posicao = parseInt(posMatch[1], 10)
@@ -58,22 +66,48 @@ export function parseClassificacao(texto: string): LinhaClassificacao[] {
     let equipa = ''
     let tempoBruto = ''
 
-    if (colsLinha.length >= 3) {
-      // Tudo numa única linha: posição, nome, [equipa,] ..., tempo
-      nome = colsLinha[1]
-      equipa = colsLinha.length > 2 ? colsLinha[2] : ''
-      tempoBruto = colsLinha[colsLinha.length - 1]
-      i += 1
-    } else {
-      // Nome nesta linha; equipa + tempo vêm na linha seguinte
-      nome = colsLinha[1] ?? primeiraCol.replace(/^\d+/, '')
-      const proxima = linhas[i + 1]
-      if (proxima && !/^\d+(\s|\t)/.test(proxima)) {
-        const colsProxima = proxima.split('\t').map(c => c.trim()).filter(c => c !== '')
-        if (colsProxima.length > 0) {
-          equipa = colsProxima[0]
-          tempoBruto = colsProxima[colsProxima.length - 1]
+    if (cols.length >= 2) {
+      // Formato por colunas (tabs). Encontra a coluna do nome: a 1ª coluna
+      // (a partir da 2ª) com letras que não seja número puro nem marca de
+      // variação — assim salta "rank anterior" e a seta ▲/▼ das etapas 2+.
+      let nameIdx = -1
+      for (let k = 1; k < cols.length; k++) {
+        const c = cols[k]
+        if (temLetra(c) && !ehMudanca(c) && !ehNumero(c)) { nameIdx = k; break }
+      }
+      if (nameIdx === -1) { i++; continue }
+
+      nome = cols[nameIdx]
+      if (nameIdx < cols.length - 1) {
+        // Tudo na mesma linha: equipa a seguir ao nome, tempo na última coluna.
+        equipa = cols[nameIdx + 1] ?? ''
+        tempoBruto = cols[cols.length - 1]
+        i += 1
+      } else {
+        // Nome é a última coluna → equipa + tempo vêm na linha seguinte.
+        const proxima = linhas[i + 1]
+        if (proxima && !/^\d/.test(proxima.trim())) {
+          const colsP = proxima.split('\t').map(c => c.trim()).filter(Boolean)
+          if (colsP.length > 0) {
+            equipa = colsP[0]
+            tempoBruto = colsP[colsP.length - 1]
+          }
+          i += 2
+        } else {
+          i += 1
         }
+      }
+    } else {
+      // Uma só coluna (separada por espaços, sem tabs). Descasca a linha:
+      // rank [rankAnterior] [▲▼= variação] Nome…  — equipa/tempo na linha
+      // seguinte.
+      const m = primeiraCol.match(/^(\d+)\s+(?:\d+\s+)?(?:[▲▼△▽▴▾⏶⏷=+\-]\s*\d*\s+)?(.*)$/u)
+      nome = (m?.[2] ?? '').trim()
+      const proxima = linhas[i + 1]
+      if (proxima && !/^\d/.test(proxima.trim())) {
+        const tempoM = proxima.trim().match(/([,″]+|\d[\d:.'"hms ]*\d|\d+)\s*$/)
+        equipa = proxima.trim()
+        tempoBruto = tempoM ? tempoM[1].trim() : ''
         i += 2
       } else {
         i += 1
