@@ -118,8 +118,101 @@ function iniciais(nome: string) {
 type CompData = {
   prova: Prova
   etapas: EtapaResultado[]
+  apostas: ApostaRow[]
   hasStandings: boolean
-  generalStandings: PlayerStanding[]
+}
+
+/**
+ * Calcula a classificação dos jogadores para UMA etapa específica (a que
+ * estiver selecionada na navegação), pontuando as apostas contra a
+ * classificação geral dessa etapa. Devolve já ordenado por desempate.
+ */
+function computarStandings(etapa: EtapaResultado, apostas: ApostaRow[], prova: Prova): PlayerStanding[] {
+  const categoria = prova.categoria
+  const config = getConfigCategoria(categoria)
+  const isSimples = categoria === 'monumento' || categoria === 'prova_dia'
+
+  // Mapas de posição real (normalizados por nome) para etiquetar cada aposta
+  // com a posição do ciclista NESTA etapa. A completa cobre abaixo do 20º
+  // quando existe; senão cai no Top-20; senão "Fora".
+  const posCompleta = new Map<string, number>()
+  ;(etapa.classificacao_geral_completa ?? []).forEach(l => {
+    if (l?.nome && l.nome.trim()) posCompleta.set(normalizarNome(l.nome), l.posicao)
+  })
+  const posTop20 = new Map<string, number>()
+  etapa.classificacao_geral_top20.forEach((nome, i) => {
+    if (nome && nome.trim()) posTop20.set(normalizarNome(nome), i + 1)
+  })
+  const posicaoRealLabel = (nome: string): string => {
+    const n = normalizarNome(nome)
+    const p = posCompleta.get(n) ?? posTop20.get(n)
+    return p ? `→ ${p}º` : '→ Fora'
+  }
+
+  const computados = apostas.map(aposta => {
+    const camisolasApostadas = {
+      sprint: aposta.camisola_sprint ?? '',
+      montanha: aposta.camisola_montanha ?? '',
+      juventude: aposta.camisola_juventude ?? '',
+    }
+    const camisolasReais = {
+      sprint: etapa.camisola_sprint ?? '',
+      montanha: etapa.camisola_montanha ?? '',
+      juventude: etapa.camisola_juventude ?? '',
+    }
+    const calc = calcularPontos(aposta.apostas_top20, etapa.classificacao_geral_top20, camisolasApostadas, camisolasReais, categoria)
+
+    // Mapa normalizado nome -> item do breakdown (para pontos por ciclista).
+    const porNome = new Map(calc.breakdown.map(b => [normalizarNome(b.ciclista), b]))
+    const betRows: BetRow[] = (aposta.apostas_top20 ?? []).map((nome, idx) => {
+      const item = nome ? porNome.get(normalizarNome(nome)) : undefined
+      const pts = item?.pontos ?? 0
+      return {
+        position: idx + 1,
+        name: nome && nome.trim() ? nome.trim() : '—',
+        realPositionLabel: nome && nome.trim() ? posicaoRealLabel(nome) : '',
+        points: pts,
+        isBonus: !isSimples && item?.tipo === 'top10_bonus' && pts === 1,
+      }
+    })
+
+    const camisolaCalc = config.temCamisolas ? calcularCamisolas(camisolasApostadas, camisolasReais) : []
+    const jerseys: JerseyRow[] = camisolaCalc.map(c => ({
+      tipo: c.tipo,
+      apostado: c.apostado,
+      acertou: c.acertou,
+      pontos: c.pontos,
+    }))
+
+    return {
+      userId: aposta.user_id,
+      name: aposta.perfil?.full_name || aposta.perfil?.username || 'Jogador',
+      avatarUrl: aposta.perfil?.avatar_url ?? null,
+      calc,
+      top10: calc.breakdown.filter(b => b.tipo === 'top10_exato').length,
+      top20: calc.breakdown.filter(b => b.tipo === 'top20_exato').length,
+      betRows,
+      jerseys,
+    }
+  })
+
+  computados.sort((a, b) => compararDesempate(a.calc, b.calc))
+
+  return computados.map(c => ({
+    userId: c.userId,
+    name: c.name,
+    avatarUrl: c.avatarUrl,
+    points: c.calc.pontos_total,
+    top10: c.top10,
+    top20: c.top20,
+    provaNome: prova.nome,
+    pontosTop10: c.calc.pontos_top10,
+    pontosTop20: c.calc.pontos_top20,
+    pontosCamisolas: c.calc.pontos_camisolas,
+    temCamisolas: config.temCamisolas,
+    betRows: c.betRows,
+    jerseys: c.jerseys,
+  }))
 }
 
 export default function ClassificacaoPage() {
@@ -178,104 +271,10 @@ export default function ClassificacaoPage() {
         const etapas = (etapasData ?? []) as EtapaResultado[]
         const apostas = (apostasData ?? []) as unknown as ApostaRow[]
 
-        if (etapas.length === 0 || apostas.length === 0) {
-          results.push({
-            prova,
-            etapas,
-            hasStandings: false,
-            generalStandings: [],
-          })
-          continue
-        }
-
-        const categoria = prova.categoria
-        const config = getConfigCategoria(categoria)
-        const isSimples = categoria === 'monumento' || categoria === 'prova_dia'
-        const latest = etapas[etapas.length - 1]
-
-        // Mapas de posição real (normalizados por nome) para etiquetar cada
-        // aposta com a posição atual do ciclista. A completa cobre abaixo do
-        // 20º quando existe; senão cai no Top-20; senão "Fora".
-        const posCompleta = new Map<string, number>()
-        ;(latest.classificacao_geral_completa ?? []).forEach(l => {
-          if (l?.nome && l.nome.trim()) posCompleta.set(normalizarNome(l.nome), l.posicao)
-        })
-        const posTop20 = new Map<string, number>()
-        latest.classificacao_geral_top20.forEach((nome, i) => {
-          if (nome && nome.trim()) posTop20.set(normalizarNome(nome), i + 1)
-        })
-        const posicaoRealLabel = (nome: string): string => {
-          const n = normalizarNome(nome)
-          const p = posCompleta.get(n) ?? posTop20.get(n)
-          return p ? `→ ${p}º` : '→ Fora'
-        }
-
-        const computados = apostas.map(aposta => {
-          const camisolasApostadas = {
-            sprint: aposta.camisola_sprint ?? '',
-            montanha: aposta.camisola_montanha ?? '',
-            juventude: aposta.camisola_juventude ?? '',
-          }
-          const camisolasReais = {
-            sprint: latest.camisola_sprint ?? '',
-            montanha: latest.camisola_montanha ?? '',
-            juventude: latest.camisola_juventude ?? '',
-          }
-          const calc = calcularPontos(aposta.apostas_top20, latest.classificacao_geral_top20, camisolasApostadas, camisolasReais, categoria)
-
-          // Mapa normalizado nome -> item do breakdown (para pontos por ciclista).
-          const porNome = new Map(calc.breakdown.map(b => [normalizarNome(b.ciclista), b]))
-          const betRows: BetRow[] = (aposta.apostas_top20 ?? []).map((nome, idx) => {
-            const item = nome ? porNome.get(normalizarNome(nome)) : undefined
-            const pts = item?.pontos ?? 0
-            return {
-              position: idx + 1,
-              name: nome && nome.trim() ? nome.trim() : '—',
-              realPositionLabel: nome && nome.trim() ? posicaoRealLabel(nome) : '',
-              points: pts,
-              isBonus: !isSimples && item?.tipo === 'top10_bonus' && pts === 1,
-            }
-          })
-
-          const camisolaCalc = config.temCamisolas ? calcularCamisolas(camisolasApostadas, camisolasReais) : []
-          const jerseys: JerseyRow[] = camisolaCalc.map(c => ({
-            tipo: c.tipo,
-            apostado: c.apostado,
-            acertou: c.acertou,
-            pontos: c.pontos,
-          }))
-
-          return {
-            userId: aposta.user_id,
-            name: aposta.perfil?.full_name || aposta.perfil?.username || 'Jogador',
-            avatarUrl: aposta.perfil?.avatar_url ?? null,
-            calc,
-            top10: calc.breakdown.filter(b => b.tipo === 'top10_exato').length,
-            top20: calc.breakdown.filter(b => b.tipo === 'top20_exato').length,
-            betRows,
-            jerseys,
-          }
-        })
-
-        computados.sort((a, b) => compararDesempate(a.calc, b.calc))
-
-        const generalStandings: PlayerStanding[] = computados.map(c => ({
-          userId: c.userId,
-          name: c.name,
-          avatarUrl: c.avatarUrl,
-          points: c.calc.pontos_total,
-          top10: c.top10,
-          top20: c.top20,
-          provaNome: prova.nome,
-          pontosTop10: c.calc.pontos_top10,
-          pontosTop20: c.calc.pontos_top20,
-          pontosCamisolas: c.calc.pontos_camisolas,
-          temCamisolas: config.temCamisolas,
-          betRows: c.betRows,
-          jerseys: c.jerseys,
-        }))
-
-        results.push({ prova, etapas, hasStandings: true, generalStandings })
+        // A classificação por etapa é calculada no render (depende da etapa
+        // selecionada) — aqui só guardamos os dados em bruto.
+        const hasStandings = etapas.length > 0 && apostas.length > 0
+        results.push({ prova, etapas, apostas, hasStandings })
       }
 
       setComps(results)
@@ -350,6 +349,10 @@ export default function ClassificacaoPage() {
               const idx = stageIdx[comp.prova.id] ?? comp.etapas.length - 1
               const etapaAtual = comp.etapas[idx]
               const ehFinal = comp.prova.status === 'finalizada'
+              // Classificação dos jogadores para a etapa SELECIONADA.
+              const standings = comp.hasStandings && etapaAtual
+                ? computarStandings(etapaAtual, comp.apostas, comp.prova)
+                : []
 
               return (
                 <div key={comp.prova.id}>
@@ -400,7 +403,7 @@ export default function ClassificacaoPage() {
                       {/* Classificação geral dos apostadores */}
                       <div className="display-lg mb-3">Classificação Geral</div>
                       <div className="bg-surface border border-border rounded-lg overflow-hidden mb-8">
-                        {comp.generalStandings.map((player, i) => (
+                        {standings.map((player, i) => (
                           <div
                             key={player.userId}
                             role="button"
