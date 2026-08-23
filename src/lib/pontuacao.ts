@@ -41,6 +41,25 @@ export function getConfigCategoria(categoria?: CategoriaProvaTipo | null): Confi
   return CONFIGS[categoria ?? 'grande_volta']
 }
 
+/**
+ * Normaliza um nome de ciclista para comparação robusta entre fontes.
+ * A startlist (parser do PDF) e a classificação (parser do copy-paste)
+ * gravam os nomes com formatos diferentes — sobretudo acentos: a startlist
+ * costuma vir sem diacríticos (ex: "Pogacar Tadej") e a classificação com
+ * eles (ex: "Pogačar Tadej"). Sem esta normalização o match falhava e o
+ * jogador ficava com 0 pontos nesse ciclista.
+ *
+ * Remove acentos/diacríticos, passa a minúsculas e colapsa espaços.
+ */
+export function normalizarNome(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove marcas de acento (combining diacritical marks)
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export type PontoTipo = 'top10_exato' | 'top20_exato' | 'top10_bonus' | 'top20_bonus' | 'fora' | 'nao_top20'
 
 export interface PontoBreakdownItem {
@@ -92,17 +111,20 @@ export function calcularPontos(
   let acertos_exatos_top10 = 0
   let acertos_exatos_top20 = 0
 
-  // Mapa: ciclista (lower) -> posição real (1-indexed)
+  // Mapa: ciclista (normalizado) -> posição real (1-indexed).
+  // Usa normalizarNome para os nomes baterem certo entre a startlist
+  // (com que se aposta) e a classificação (com que se pontua), mesmo
+  // com diferenças de acentos/maiúsculas.
   const posicaoReal = new Map<string, number>()
   resultadoTopN.forEach((ciclista, idx) => {
-    if (ciclista && ciclista.trim()) posicaoReal.set(ciclista.trim().toLowerCase(), idx + 1)
+    if (ciclista && ciclista.trim()) posicaoReal.set(normalizarNome(ciclista), idx + 1)
   })
 
   apostasTopN.forEach((ciclista, idx) => {
     if (!ciclista || !ciclista.trim()) return
     if (idx >= numPos) return
 
-    const nomeLower = ciclista.trim().toLowerCase()
+    const nomeLower = normalizarNome(ciclista)
     const posApostada = idx + 1
     const posReal = posicaoReal.get(nomeLower) ?? null
 
@@ -223,7 +245,7 @@ export function calcularCamisolas(
   return tipos.map(({ tipo }) => {
     const apostado = apostadas[tipo] ?? ''
     const real = reais[tipo] ?? ''
-    const acertou = apostado.trim().toLowerCase() === real.trim().toLowerCase() && apostado.trim() !== ''
+    const acertou = normalizarNome(apostado) === normalizarNome(real) && apostado.trim() !== ''
     return {
       tipo,
       apostado: apostado.trim(),
