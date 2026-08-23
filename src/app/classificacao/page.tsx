@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { calcularPontos, compararDesempate, getConfigCategoria, type CategoriaProvaTipo } from '@/lib/pontuacao'
-import JerseyBadge from '@/components/JerseyBadge'
+import { calcularPontos, calcularCamisolas, compararDesempate, getConfigCategoria, normalizarNome, type CategoriaProvaTipo } from '@/lib/pontuacao'
+import JerseyBadge, { JerseyCircle, getJerseyPalette, getJerseyLabel, type JerseyTipo } from '@/components/JerseyBadge'
 
 // ── Ícones (mesmo estilo outline das outras páginas) ──
 const HomeIcon = () => (
@@ -75,6 +75,21 @@ type ApostaRow = {
   perfil: { username: string; full_name: string | null; avatar_url: string | null } | null
 }
 
+type BetRow = {
+  position: number
+  name: string
+  realPositionLabel: string
+  points: number
+  isBonus: boolean
+}
+
+type JerseyRow = {
+  tipo: JerseyTipo
+  apostado: string
+  acertou: boolean
+  pontos: number
+}
+
 type PlayerStanding = {
   userId: string
   name: string
@@ -82,6 +97,22 @@ type PlayerStanding = {
   points: number
   top10: number
   top20: number
+  // Detalhe para o bottom sheet da aposta do jogador
+  provaNome: string
+  pontosTop10: number
+  pontosTop20: number
+  pontosCamisolas: number
+  temCamisolas: boolean
+  betRows: BetRow[]
+  jerseys: JerseyRow[]
+}
+
+/** Iniciais para o avatar (quando não há foto). Ex: "Nuno Madeira" -> "NM". */
+function iniciais(nome: string) {
+  const partes = nome.trim().split(/\s+/)
+  const a = partes[0]?.[0] ?? ''
+  const b = partes.length > 1 ? partes[partes.length - 1][0] : ''
+  return (a + b).toUpperCase()
 }
 
 type CompData = {
@@ -97,6 +128,7 @@ export default function ClassificacaoPage() {
   const [stageIdx, setStageIdx] = useState<Record<string, number>>({})
   const [menuOpen, setMenuOpen] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [sheetPlayer, setSheetPlayer] = useState<PlayerStanding | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -157,7 +189,26 @@ export default function ClassificacaoPage() {
         }
 
         const categoria = prova.categoria
+        const config = getConfigCategoria(categoria)
+        const isSimples = categoria === 'monumento' || categoria === 'prova_dia'
         const latest = etapas[etapas.length - 1]
+
+        // Mapas de posição real (normalizados por nome) para etiquetar cada
+        // aposta com a posição atual do ciclista. A completa cobre abaixo do
+        // 20º quando existe; senão cai no Top-20; senão "Fora".
+        const posCompleta = new Map<string, number>()
+        ;(latest.classificacao_geral_completa ?? []).forEach(l => {
+          if (l?.nome && l.nome.trim()) posCompleta.set(normalizarNome(l.nome), l.posicao)
+        })
+        const posTop20 = new Map<string, number>()
+        latest.classificacao_geral_top20.forEach((nome, i) => {
+          if (nome && nome.trim()) posTop20.set(normalizarNome(nome), i + 1)
+        })
+        const posicaoRealLabel = (nome: string): string => {
+          const n = normalizarNome(nome)
+          const p = posCompleta.get(n) ?? posTop20.get(n)
+          return p ? `→ ${p}º` : '→ Fora'
+        }
 
         const computados = apostas.map(aposta => {
           const camisolasApostadas = {
@@ -171,6 +222,29 @@ export default function ClassificacaoPage() {
             juventude: latest.camisola_juventude ?? '',
           }
           const calc = calcularPontos(aposta.apostas_top20, latest.classificacao_geral_top20, camisolasApostadas, camisolasReais, categoria)
+
+          // Mapa normalizado nome -> item do breakdown (para pontos por ciclista).
+          const porNome = new Map(calc.breakdown.map(b => [normalizarNome(b.ciclista), b]))
+          const betRows: BetRow[] = (aposta.apostas_top20 ?? []).map((nome, idx) => {
+            const item = nome ? porNome.get(normalizarNome(nome)) : undefined
+            const pts = item?.pontos ?? 0
+            return {
+              position: idx + 1,
+              name: nome && nome.trim() ? nome.trim() : '—',
+              realPositionLabel: nome && nome.trim() ? posicaoRealLabel(nome) : '',
+              points: pts,
+              isBonus: !isSimples && item?.tipo === 'top10_bonus' && pts === 1,
+            }
+          })
+
+          const camisolaCalc = config.temCamisolas ? calcularCamisolas(camisolasApostadas, camisolasReais) : []
+          const jerseys: JerseyRow[] = camisolaCalc.map(c => ({
+            tipo: c.tipo,
+            apostado: c.apostado,
+            acertou: c.acertou,
+            pontos: c.pontos,
+          }))
+
           return {
             userId: aposta.user_id,
             name: aposta.perfil?.full_name || aposta.perfil?.username || 'Jogador',
@@ -178,6 +252,8 @@ export default function ClassificacaoPage() {
             calc,
             top10: calc.breakdown.filter(b => b.tipo === 'top10_exato').length,
             top20: calc.breakdown.filter(b => b.tipo === 'top20_exato').length,
+            betRows,
+            jerseys,
           }
         })
 
@@ -190,6 +266,13 @@ export default function ClassificacaoPage() {
           points: c.calc.pontos_total,
           top10: c.top10,
           top20: c.top20,
+          provaNome: prova.nome,
+          pontosTop10: c.calc.pontos_top10,
+          pontosTop20: c.calc.pontos_top20,
+          pontosCamisolas: c.calc.pontos_camisolas,
+          temCamisolas: config.temCamisolas,
+          betRows: c.betRows,
+          jerseys: c.jerseys,
         }))
 
         results.push({ prova, etapas, hasStandings: true, generalStandings })
@@ -320,7 +403,11 @@ export default function ClassificacaoPage() {
                         {comp.generalStandings.map((player, i) => (
                           <div
                             key={player.userId}
-                            className={`flex items-center gap-3 px-4 py-3.5 border-b border-border last:border-b-0 ${i % 2 === 1 ? 'bg-surface-2' : ''}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSheetPlayer(player)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSheetPlayer(player) } }}
+                            className={`flex items-center gap-3 px-4 py-3.5 border-b border-border last:border-b-0 cursor-pointer hover:bg-surface-2 transition-colors ${i % 2 === 1 ? 'bg-surface-2' : ''}`}
                           >
                             <div className={`w-8 text-center mono font-extrabold text-base ${medalClass(i + 1)}`}>{i + 1}</div>
                             <div className="w-9 h-9 rounded-full bg-surface-3 border border-border overflow-hidden flex-shrink-0">
@@ -425,6 +512,113 @@ export default function ClassificacaoPage() {
           )
         })}
       </footer>
+
+      {/* Bottom sheet — aposta do jogador */}
+      {sheetPlayer && (
+        <div className="fixed inset-0 z-40" role="dialog" aria-modal="true">
+          {/* Scrim */}
+          <div
+            onClick={() => setSheetPlayer(null)}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(22,20,15,0.4)' }}
+          />
+          {/* Sheet */}
+          <div
+            style={{
+              position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+              width: '100%', maxWidth: 480, background: 'var(--surface)',
+              borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column',
+              maxHeight: '88vh', boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+            }}
+          >
+            {/* Drag handle */}
+            <div style={{ padding: '12px 0', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 40, height: 4, background: 'var(--border)', borderRadius: 2, cursor: 'pointer' }} onClick={() => setSheetPlayer(null)} />
+            </div>
+
+            {/* Header do jogador (card preto) */}
+            <div style={{ background: 'var(--ink)', padding: 24, display: 'flex', gap: 16, alignItems: 'flex-start', flexShrink: 0 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 999, flexShrink: 0, overflow: 'hidden', background: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {sheetPlayer.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sheetPlayer.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 20, fontWeight: 700, color: 'var(--gold-ink)' }}>{iniciais(sheetPlayer.name)}</span>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: 18, fontWeight: 500, color: 'var(--on-ink)', lineHeight: 1.2 }}>{sheetPlayer.name}</div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 500, color: 'var(--on-ink-dim)', marginTop: 4, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  {sheetPlayer.pontosTop10} pts top-10 · {sheetPlayer.pontosTop20} pts 11-20{sheetPlayer.temCamisolas ? ` · ${sheetPlayer.pontosCamisolas} camisolas` : ''}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 32, fontWeight: 700, color: 'var(--gold)', lineHeight: 1 }}>{sheetPlayer.points}</div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 500, color: 'var(--on-ink-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>pts</div>
+              </div>
+            </div>
+
+            {/* Conteúdo com scroll */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {/* Aposta — Top 20 */}
+              <div style={{ padding: '24px 20px 0' }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>Aposta — Top 20</div>
+                {sheetPlayer.betRows.map(row => {
+                  const scored = row.points > 0
+                  return (
+                    <div
+                      key={row.position}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px',
+                        background: scored ? 'var(--gold-soft)' : 'transparent',
+                        borderRadius: 8, marginBottom: 8, opacity: scored ? 1 : 0.6,
+                      }}
+                    >
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: scored ? 'var(--text)' : 'var(--text-dim)', minWidth: 24 }}>{row.position}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontFamily: 'Archivo, sans-serif', fontSize: 14, fontWeight: 500, color: scored ? 'var(--text)' : 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</div>
+                      {row.isBonus && (
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 700, background: 'var(--gold)', color: 'var(--gold-ink)', padding: '3px 8px', borderRadius: 4 }}>BÓNUS</div>
+                      )}
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: scored ? 'var(--text-dim)' : 'var(--text-sub)', minWidth: 48, textAlign: 'right' }}>{row.realPositionLabel}</div>
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: scored ? 'var(--gold)' : 'var(--text-sub)', minWidth: 32, textAlign: 'right' }}>{scored ? `+${row.points}` : '0'}</div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Camisolas */}
+              {sheetPlayer.temCamisolas && (
+                <div style={{ padding: '24px 20px 0' }}>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>Camisolas</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sheetPlayer.jerseys.map(j => (
+                      <div
+                        key={j.tipo}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', background: j.acertou ? 'var(--gold-soft)' : 'transparent', borderRadius: 8, opacity: j.acertou ? 1 : 0.6 }}
+                      >
+                        <JerseyCircle palette={getJerseyPalette(sheetPlayer.provaNome, j.tipo)} />
+                        <div style={{ flex: 1, fontFamily: 'Archivo, sans-serif', fontSize: 14, fontWeight: 500, color: j.acertou ? 'var(--text)' : 'var(--text-dim)' }}>{getJerseyLabel(sheetPlayer.provaNome, j.tipo)}</div>
+                        <div style={{ fontFamily: 'Archivo, sans-serif', fontSize: 13, fontWeight: 500, color: j.acertou ? 'var(--text-dim)' : 'var(--text-sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140, textAlign: 'right' }}>{j.apostado || '—'}</div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: j.acertou ? 'var(--gold)' : 'var(--text-sub)', minWidth: 24, textAlign: 'right' }}>{j.acertou ? '+1' : '0'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ height: 16 }} />
+            </div>
+
+            {/* Footer Total */}
+            <div style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ fontFamily: 'Archivo, sans-serif', fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>Total</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 32, fontWeight: 700, color: 'var(--gold)', lineHeight: 1 }}>{sheetPlayer.points}</div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 500, color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>pts</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
